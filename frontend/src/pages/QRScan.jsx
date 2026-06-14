@@ -1,12 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { submitQREmail } from '../services/api'
-import { ClipboardList, Mail, GraduationCap, Briefcase } from 'lucide-react'
+import { ClipboardList, Mail, GraduationCap, Briefcase, CheckCircle } from 'lucide-react'
 
 export default function QRScan() {
-  const [type, setType] = useState(null) // 'student' | 'employee'
+  const [params] = useSearchParams()
+  const testSetId = params.get('test') // test-specific QR passes ?test=ID
+
+  const [type, setType] = useState(null)
   const [form, setForm] = useState({})
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [testLink, setTestLink] = useState(null)
   const [error, setError] = useState('')
 
   function handleChange(e) {
@@ -18,7 +23,10 @@ export default function QRScan() {
     setError('')
     setLoading(true)
     try {
-      await submitQREmail({ ...form, candidate_type: type })
+      const payload = { ...form, candidate_type: type }
+      if (testSetId) payload.test_set_id = parseInt(testSetId)
+      const res = await submitQREmail(payload)
+      setTestLink(res.data.test_link || null)
       setSuccess(true)
     } catch (err) {
       setError(err.response?.data?.detail || 'Something went wrong. Please try again.')
@@ -36,15 +44,28 @@ export default function QRScan() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900">BD Testify</h1>
           <p className="text-gray-500 text-sm mt-1">Building Doctor Assessment</p>
+          {testSetId && (
+            <span className="inline-block mt-2 bg-blue-100 text-blue-700 text-xs font-medium px-3 py-1 rounded-full">
+              Test-specific registration
+            </span>
+          )}
         </div>
 
         {success ? (
           <div className="text-center py-6">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Mail className="w-8 h-8 text-green-600" />
+              <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Check Your Email!</h2>
-            <p className="text-gray-500">We've sent your test link to <strong>{form.email}</strong>. Please check your inbox and spam folder.</p>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">You're Registered!</h2>
+            <p className="text-gray-500 mb-4">
+              A test link has been sent to <strong>{form.email}</strong>.
+            </p>
+            {testLink && (
+              <a href={testLink}
+                className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition">
+                Start Test Now →
+              </a>
+            )}
           </div>
         ) : !type ? (
           <>
@@ -84,12 +105,12 @@ export default function QRScan() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                 <input name="name" type="text" className="input-field" placeholder="Your full name"
                   onChange={handleChange} required />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
                 <input name="email" type="email" className="input-field" placeholder="your@email.com"
                   onChange={handleChange} required />
               </div>
@@ -149,7 +170,7 @@ export default function QRScan() {
 
               <button type="submit" disabled={loading}
                 className={`w-full py-3 rounded-xl font-semibold text-white transition ${type === 'student' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'}`}>
-                {loading ? 'Submitting…' : 'Submit & Get Test Link'}
+                {loading ? 'Registering…' : 'Register & Get Test Link'}
               </button>
             </form>
           </>

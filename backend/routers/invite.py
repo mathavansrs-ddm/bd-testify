@@ -100,8 +100,11 @@ def bulk_send_invites(data: schemas.BulkInviteSend, db: Session = Depends(get_db
 
 
 @router.post("/qr/generate")
-def generate_qr_code(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
-    qr_url = f"{FRONTEND_URL}/qr-landing"
+def generate_qr_code(test_set_id: int = None, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    if test_set_id:
+        qr_url = f"{FRONTEND_URL}/qr-landing?test={test_set_id}"
+    else:
+        qr_url = f"{FRONTEND_URL}/qr-landing"
     qr_base64 = generate_qr(qr_url)
     return {"qr_image": qr_base64, "url": qr_url}
 
@@ -110,21 +113,44 @@ def generate_qr_code(db: Session = Depends(get_db), admin=Depends(get_current_ad
 def qr_submit_email(data: schemas.QREmailSubmit, db: Session = Depends(get_db)):
     email = data.email.strip().lower()
     candidate = db.query(models.Candidate).filter(models.Candidate.email == email).first()
+
+    # Auto-register if not exists
     if not candidate:
-        raise HTTPException(status_code=404, detail="This email is not registered. Please register first or use your invite link.")
+        if not data.name:
+            raise HTTPException(status_code=400, detail="Please provide your name to register.")
+        c_type = models.CandidateType.internal if data.candidate_type == "employee" else models.CandidateType.external
+        candidate = models.Candidate(
+            name=data.name,
+            email=email,
+            phone=data.phone or "",
+            candidate_type=c_type,
+            college_name=data.college or "",
+            degree=data.course or "",
+            year_of_study=data.year or "",
+            employee_id=data.employee_id or "",
+            department=data.department or "",
+            invited_by=models.InviteSource.qr_scan,
+        )
+        db.add(candidate)
+        db.flush()
 
     if candidate.is_blocked:
         raise HTTPException(status_code=403, detail="Your account has been blocked. Contact admin.")
 
-    active_set = db.query(models.TestSet).filter(models.TestSet.is_active == True).first()
-    if not active_set:
+    # Find test set — use specific one if provided, else active
+    if data.test_set_id:
+        test_set = db.query(models.TestSet).filter(models.TestSet.id == data.test_set_id).first()
+    else:
+        test_set = db.query(models.TestSet).filter(models.TestSet.is_active == True).first()
+
+    if not test_set:
         raise HTTPException(status_code=404, detail="No active test available right now")
 
     token = str(uuid.uuid4())
     invite = models.TestInvite(
         candidate_email=email,
         token=token,
-        test_set_id=active_set.id,
+        test_set_id=test_set.id,
         expires_at=datetime.utcnow() + timedelta(hours=48),
     )
     db.add(invite)
@@ -137,7 +163,7 @@ def qr_submit_email(data: schemas.QREmailSubmit, db: Session = Depends(get_db)):
     except Exception:
         pass
 
-    return {"message": "Test link sent to your email.", "token": token}
+    return {"message": "Registered! Test link sent to your email.", "token": token, "test_link": link}
 
 
 @router.get("/validate/{token}")

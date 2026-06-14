@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
-import { Plus, Edit, Trash2, X } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { Plus, Edit, Trash2, X, Upload, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
-import { getQuestions, createQuestion, updateQuestion, deleteQuestion, getTestSets } from '../services/api'
+import { getQuestions, createQuestion, updateQuestion, deleteQuestion, getTestSets, bulkUploadQuestions } from '../services/api'
 
 const BLANK = { test_set_id: '', question_text: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: 'a', marks: 1 }
 
@@ -57,19 +57,59 @@ export default function QuestionManager() {
     } catch { toast.error('Failed to delete') }
   }
 
+  const fileRef = useRef()
+  const [bulkTestSetId, setBulkTestSetId] = useState('')
+
+  async function handleBulkUpload(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    const fd = new FormData()
+    fd.append('file', file)
+    const params = bulkTestSetId ? `?test_set_id=${bulkTestSetId}` : ''
+    try {
+      const r = await bulkUploadQuestions(fd, bulkTestSetId || null)
+      toast.success(`Uploaded ${r.data.created} questions${r.data.errors.length ? `, ${r.data.errors.length} errors` : ''}`)
+      loadQuestions()
+    } catch (err) { toast.error(err.response?.data?.detail || 'Upload failed') }
+    e.target.value = ''
+  }
+
+  function downloadTemplate() {
+    const csv = 'question_text,option_a,option_b,option_c,option_d,correct_answer,marks,test_set_id\n' +
+      '"What is 2+2?","1","2","4","8","c",1,\n' +
+      '"Capital of India?","Mumbai","Delhi","Chennai","Kolkata","b",1,\n'
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+    a.download = 'questions_template.csv'; a.click()
+  }
+
   const getSetName = (id) => testSets.find((s) => s.id === id)?.set_name || '—'
 
   return (
     <AdminLayout title="Question Manager">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <select className="input-field w-48" value={filterSet} onChange={(e) => setFilterSet(e.target.value)}>
             <option value="">All Test Sets</option>
             {testSets.map((s) => <option key={s.id} value={s.id}>{s.set_name}</option>)}
           </select>
-          <button onClick={openCreate} className="btn-primary flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Add Question
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Bulk upload */}
+            <select className="input-field w-44 text-sm" value={bulkTestSetId} onChange={(e) => setBulkTestSetId(e.target.value)}>
+              <option value="">— Assign to set —</option>
+              {testSets.map((s) => <option key={s.id} value={s.id}>{s.set_name}</option>)}
+            </select>
+            <input ref={fileRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={handleBulkUpload} />
+            <button onClick={() => fileRef.current.click()} className="btn-secondary flex items-center gap-2 text-sm">
+              <Upload className="w-4 h-4" /> Bulk Upload
+            </button>
+            <button onClick={downloadTemplate} title="Download CSV template" className="btn-secondary p-2">
+              <Download className="w-4 h-4" />
+            </button>
+            <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+              <Plus className="w-4 h-4" /> Add Question
+            </button>
+          </div>
         </div>
 
         <div className="card p-0 overflow-hidden">

@@ -106,6 +106,49 @@ def delete_question(id: int, db: Session = Depends(get_db), admin=Depends(get_cu
     return {"message": "Question deleted"}
 
 
+@router.post("/questions/bulk-upload")
+async def bulk_upload_questions(
+    file: UploadFile = File(...),
+    test_set_id: int = None,
+    db: Session = Depends(get_db),
+    admin=Depends(get_current_admin)
+):
+    """Upload questions via CSV. Columns: question_text, option_a, option_b, option_c, option_d, correct_answer, marks, test_set_id (optional)"""
+    content = await file.read()
+    try:
+        if file.filename.endswith('.csv'):
+            reader = csv.DictReader(io.StringIO(content.decode('utf-8-sig')))
+            rows = list(reader)
+        else:
+            df = pd.read_excel(io.BytesIO(content))
+            rows = df.to_dict('records')
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not parse file: {e}")
+
+    created, errors = [], []
+    for i, row in enumerate(rows, 1):
+        try:
+            row = {k.strip().lower().replace(' ', '_'): str(v).strip() for k, v in row.items() if v is not None}
+            ts_id = test_set_id or int(row.get('test_set_id', 0)) or None
+            q = models.Question(
+                question_text=row['question_text'],
+                option_a=row['option_a'],
+                option_b=row['option_b'],
+                option_c=row['option_c'],
+                option_d=row['option_d'],
+                correct_answer=row['correct_answer'].lower(),
+                marks=int(row.get('marks', 1)),
+                test_set_id=ts_id,
+            )
+            db.add(q)
+            created.append(i)
+        except Exception as e:
+            errors.append({"row": i, "error": str(e)})
+
+    db.commit()
+    return {"created": len(created), "errors": errors}
+
+
 @router.post("/test-sets", response_model=schemas.TestSetOut)
 def create_test_set(data: schemas.TestSetCreate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
     ts = models.TestSet(**data.model_dump(), created_by=admin.id)

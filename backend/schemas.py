@@ -230,6 +230,19 @@ class InviteOut(BaseModel):
 
 class QREmailSubmit(BaseModel):
     email: str
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    candidate_type: Optional[str] = "external"
+    # Student fields
+    college: Optional[str] = None
+    course: Optional[str] = None
+    year: Optional[str] = None
+    # Employee fields
+    employee_id: Optional[str] = None
+    department: Optional[str] = None
+    designation: Optional[str] = None
+    # Test-specific
+    test_set_id: Optional[int] = None
 
 
 # ── Test session ──────────────────────────────────────────────────────────

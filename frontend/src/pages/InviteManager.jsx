@@ -64,9 +64,14 @@ export default function InviteManager() {
     finally { setLoading(false) }
   }
 
+  const [qrTestSetId, setQrTestSetId] = useState('')
+
   async function handleGenerateQR() {
     setLoading(true)
-    try { const r = await generateQR(); setQrImage(r.data.qr_image) }
+    try {
+      const r = await generateQR(qrTestSetId ? +qrTestSetId : null)
+      setQrImage(r.data.qr_image)
+    }
     catch { toast.error('Failed to generate QR') }
     finally { setLoading(false) }
   }
@@ -232,16 +237,35 @@ export default function InviteManager() {
         {tab === 'qr' && (
           <div className="card max-w-md">
             <h3 className="font-semibold text-gray-800 mb-2">QR Code Registration</h3>
-            <p className="text-sm text-gray-500 mb-6">
-              Candidates scan this code and enter their email to receive a test invite link.
+            <p className="text-sm text-gray-500 mb-4">
+              Candidates scan this QR, fill their details, and go directly to the selected test.
             </p>
             {!qrImage ? (
-              <button onClick={handleGenerateQR} disabled={loading}
-                className="btn-primary w-full flex items-center justify-center gap-2">
-                <QrCode className="w-4 h-4" /> {loading ? 'Generating…' : 'Generate QR Code'}
-              </button>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Select Test (optional)</label>
+                  <select className="input-field" value={qrTestSetId} onChange={(e) => setQrTestSetId(e.target.value)}>
+                    <option value="">— Any active test —</option>
+                    {testSets.map((s) => (
+                      <option key={s.id} value={s.id}>{s.set_name} ({s.time_limit_minutes} min)</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    If selected, the QR will link candidates directly to that specific test.
+                  </p>
+                </div>
+                <button onClick={handleGenerateQR} disabled={loading}
+                  className="btn-primary w-full flex items-center justify-center gap-2">
+                  <QrCode className="w-4 h-4" /> {loading ? 'Generating…' : 'Generate QR Code'}
+                </button>
+              </div>
             ) : (
               <div className="space-y-4">
+                {qrTestSetId && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700">
+                    Linked to: <strong>{testSets.find(s => s.id == qrTestSetId)?.set_name}</strong>
+                  </div>
+                )}
                 <div className="border-2 border-gray-100 rounded-xl p-4 text-center bg-white">
                   <img src={qrImage} alt="QR Code" className="mx-auto" style={{ maxWidth: 280 }} />
                 </div>
@@ -250,7 +274,7 @@ export default function InviteManager() {
                     className="btn-primary flex-1 flex items-center justify-center gap-2">
                     <Download className="w-4 h-4" /> Download PNG
                   </button>
-                  <button onClick={() => setQrImage(null)} className="btn-secondary flex-1">Regenerate</button>
+                  <button onClick={() => { setQrImage(null); setQrTestSetId('') }} className="btn-secondary flex-1">Regenerate</button>
                 </div>
               </div>
             )}
