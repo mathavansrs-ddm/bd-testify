@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { validateToken, registerCandidate } from '../services/api'
-import { ClipboardList, AlertCircle, CheckCircle, Mail } from 'lucide-react'
+import { ClipboardList, AlertCircle, CheckCircle, Mail, PauseCircle } from 'lucide-react'
+
+const REGISTRATION_OPEN = import.meta.env.VITE_REGISTRATION_OPEN !== 'false'
 
 export default function CandidateRegister() {
   const [params] = useSearchParams()
@@ -51,6 +53,18 @@ export default function CandidateRegister() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (!REGISTRATION_OPEN) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow p-10 max-w-md w-full text-center">
+          <PauseCircle className="w-14 h-14 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Registration Paused</h2>
+          <p className="text-gray-500">New registrations are currently paused. Please contact your exam coordinator or check back later.</p>
+        </div>
+      </div>
+    )
   }
 
   if (validating) {

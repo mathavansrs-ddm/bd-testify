@@ -114,7 +114,9 @@ export default function TestRoom() {
     setCheckingCamera(true)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      stream.getTracks().forEach((t) => t.stop())
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+      }
       setCameraOk(true)
       toast.success('Camera and microphone ready!')
     } catch {
@@ -175,14 +177,26 @@ export default function TestRoom() {
           <p className="text-gray-500 mb-6">Before starting, please verify your system and read the test rules.</p>
 
           <div className="space-y-4 mb-6">
-            <div className={`flex items-center gap-3 p-3 rounded-lg border ${cameraOk ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
-              <Camera className={`w-5 h-5 ${cameraOk ? 'text-green-600' : 'text-gray-400'}`} />
-              <span className={`text-sm font-medium ${cameraOk ? 'text-green-700' : 'text-gray-600'}`}>
-                {cameraOk ? '✓ Camera & microphone ready' : 'Camera & microphone not tested'}
+            {/* Live camera preview */}
+            <div className="rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center">
+              {cameraOk ? (
+                <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
+              ) : (
+                <div className="text-center text-white/50 p-6">
+                  <Camera className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">Camera preview will appear here</p>
+                </div>
+              )}
+            </div>
+
+            <div className={`flex items-center gap-3 p-3 rounded-lg border ${cameraOk ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}>
+              <Camera className={`w-5 h-5 ${cameraOk ? 'text-green-600' : 'text-orange-500'}`} />
+              <span className={`text-sm font-medium ${cameraOk ? 'text-green-700' : 'text-orange-700'}`}>
+                {cameraOk ? '✓ Camera & microphone ready' : 'Camera & microphone required — click Test'}
               </span>
               {!cameraOk && (
-                <button onClick={checkCamera} disabled={checkingCamera} className="ml-auto text-sm btn-secondary py-1 px-3">
-                  {checkingCamera ? 'Testing…' : 'Test'}
+                <button onClick={checkCamera} disabled={checkingCamera} className="ml-auto text-sm bg-orange-500 hover:bg-orange-600 text-white py-1 px-3 rounded-lg">
+                  {checkingCamera ? 'Testing…' : 'Test Now'}
                 </button>
               )}
             </div>
