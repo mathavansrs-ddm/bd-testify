@@ -24,16 +24,16 @@ def run_migrations():
     migrations = [
         ("test_sessions", "photo_data", "TEXT"),
         ("test_sessions", "latest_snapshot", "TEXT"),
-        ("test_sessions", "snapshot_at", "DATETIME"),
+        ("test_sessions", "snapshot_at", "TIMESTAMP"),
     ]
     with engine.connect() as conn:
         for table, col, col_type in migrations:
             try:
-                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {col_type}"))
                 conn.commit()
-                print(f"[MIGRATION] Added {table}.{col}")
-            except Exception:
-                pass  # Column already exists
+                print(f"[MIGRATION] {table}.{col} ready")
+            except Exception as e:
+                print(f"[MIGRATION] {table}.{col} skipped: {e}")
 
 
 run_migrations()
