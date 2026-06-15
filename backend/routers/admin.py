@@ -630,14 +630,19 @@ def cleanup_load_test(db: Session = Depends(get_db), admin=Depends(get_current_a
     deleted_invites = 0
 
     for c in candidates:
+        # Delete child rows first to avoid FK violations
         sessions = db.query(models.TestSession).filter(models.TestSession.candidate_id == c.id).all()
         for s in sessions:
-            db.query(models.CheatingLog).filter(models.CheatingLog.session_id == s.id).delete()
-            db.query(models.Answer).filter(models.Answer.session_id == s.id).delete()
+            db.query(models.CheatingLog).filter(models.CheatingLog.session_id == s.id).delete(synchronize_session=False)
+            db.query(models.Answer).filter(models.Answer.session_id == s.id).delete(synchronize_session=False)
             db.delete(s)
             deleted_sessions += 1
-        db.query(models.TestInvite).filter(models.TestInvite.candidate_email == c.email).delete()
-        deleted_invites += 1
+
+        invites = db.query(models.TestInvite).filter(models.TestInvite.candidate_email == c.email).all()
+        for inv in invites:
+            db.delete(inv)
+            deleted_invites += 1
+
         db.delete(c)
         deleted_candidates += 1
 
