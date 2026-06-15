@@ -132,12 +132,12 @@ export default function TestRoom() {
     if (document.fullscreenElement) document.exitFullscreen()
   }
 
-  // Reattach stream whenever video element mounts after cameraOk=true
+  // Reattach stream whenever the video element remounts (step change, photo capture, etc.)
   useEffect(() => {
-    if (cameraOk && streamRef.current && videoRef.current && !photoCaptured) {
+    if (streamRef.current && videoRef.current) {
       videoRef.current.srcObject = streamRef.current
     }
-  }, [cameraOk, photoCaptured])
+  }, [step, cameraOk, photoCaptured])
 
   async function checkCamera() {
     setCheckingCamera(true)
@@ -500,8 +500,7 @@ export default function TestRoom() {
                 <WebcamMonitor videoRef={videoRef} />
               </div>
             </div>
-            <AntiCheat sessionId={sessionData.session_id} videoRef={videoRef}
-              onBlock={(reason) => { showWarningOverlay(`BLOCKED: ${reason}`); clearInterval(snapshotTimer.current); setStep(STEPS.SUSPENDED); if (document.fullscreenElement) document.exitFullscreen() }} />
+            {/* AntiCheat rendered here for desktop — hidden on mobile via parent div but still active */}
             <div className="bg-slate-50 rounded-xl p-3 space-y-2 text-xs">
               <div className="flex justify-between"><span className="text-slate-500">Warnings</span><span className={`font-bold ${warningCount >= 3 ? 'text-red-600' : ''}`}>{warningCount}/{MAX_WARNINGS}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Answered</span><span className="font-bold">{answeredCount}/{questions.length}</span></div>
@@ -531,10 +530,9 @@ export default function TestRoom() {
           </div>
 
           {/* Floating camera — small, top-right corner, non-blocking */}
+          {/* AntiCheat is NOT duplicated here — it runs once in the desktop layout which is always in DOM */}
           <div className="fixed top-14 right-2 w-24 z-30 rounded-xl overflow-hidden shadow-lg border border-slate-600">
             <WebcamMonitor videoRef={videoRef} />
-            <AntiCheat sessionId={sessionData.session_id} videoRef={videoRef}
-              onBlock={(reason) => { showWarningOverlay(`BLOCKED: ${reason}`); clearInterval(snapshotTimer.current); setStep(STEPS.SUSPENDED); if (document.fullscreenElement) document.exitFullscreen() }} />
           </div>
 
           {/* Fixed bottom nav bar */}
@@ -629,6 +627,18 @@ export default function TestRoom() {
             </div>
           </div>
         )}
+
+        {/* AntiCheat — single instance, outside layout divs, always active during test */}
+        <AntiCheat
+          sessionId={sessionData.session_id}
+          videoRef={videoRef}
+          onBlock={(reason) => {
+            showWarningOverlay(`BLOCKED: ${reason}`)
+            clearInterval(snapshotTimer.current)
+            setStep(STEPS.SUSPENDED)
+            if (document.fullscreenElement) document.exitFullscreen()
+          }}
+        />
       </div>
     )
   }
