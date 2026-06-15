@@ -7,7 +7,7 @@ import Timer from '../components/Timer'
 import ProgressBar from '../components/ProgressBar'
 import WebcamMonitor from '../components/Webcam'
 import AntiCheat from '../components/AntiCheat'
-import { AlertTriangle, CheckCircle, Camera, Shield, Eye, Clock, RefreshCw } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Camera, Shield, Eye, Clock, RefreshCw, X } from 'lucide-react'
 
 const STEPS = { SYSTEM_CHECK: 'system_check', TEST: 'test', FINISHED: 'finished', ERROR: 'error', SUSPENDED: 'suspended' }
 const MAX_WARNINGS = 5
@@ -24,6 +24,7 @@ export default function TestRoom() {
   const [showWarning, setShowWarning] = useState(false)
   const [warningMsg, setWarningMsg] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
+  const [showNavModal, setShowNavModal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
@@ -386,49 +387,45 @@ export default function TestRoom() {
 
         {/* Warning overlay */}
         {showWarning && (
-          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-bounce-once">
-            <div className="bg-red-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-start gap-3 max-w-sm border border-red-400">
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[90vw] max-w-sm">
+            <div className="bg-red-600 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-start gap-3 border border-red-400">
               <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-sm">Rule Violation — Warning {warningCount}/{MAX_WARNINGS}</p>
-                <p className="text-sm opacity-90 mt-0.5">{warningMsg}</p>
-                {warningCount >= 3 && (
-                  <p className="text-xs mt-1 opacity-75 font-semibold">⚠️ Test will be suspended at {MAX_WARNINGS} warnings!</p>
-                )}
+                <p className="font-bold text-sm">Warning {warningCount}/{MAX_WARNINGS}</p>
+                <p className="text-xs opacity-90 mt-0.5">{warningMsg}</p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Top header */}
-        <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-              <Shield className="w-4 h-4 text-white" />
+        {/* ── Top header ── */}
+        <header className="bg-white border-b border-slate-200 px-3 md:px-6 py-2 md:py-3 flex items-center justify-between shadow-sm flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-slate-900 rounded-lg flex items-center justify-center">
+              <Shield className="w-3.5 h-3.5 text-white" />
             </div>
             <div>
               <p className="font-bold text-slate-900 text-sm leading-tight">BD Testify</p>
-              <p className="text-xs text-slate-400">{sessionData.test_set_name}</p>
+              <p className="text-xs text-slate-400 hidden md:block">{sessionData.test_set_name}</p>
             </div>
           </div>
-
-          <div className="flex items-center gap-4">
-            {/* Warning indicator */}
-            <div className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full ${
+          <div className="flex items-center gap-2">
+            <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
               warningCount === 0 ? 'bg-green-100 text-green-700'
               : warningCount <= 2 ? 'bg-yellow-100 text-yellow-700'
               : 'bg-red-100 text-red-700'}`}>
               <AlertTriangle className="w-3 h-3" />
-              {warningCount}/{MAX_WARNINGS} warnings
+              {warningCount}/{MAX_WARNINGS}
             </div>
             <Timer totalMinutes={sessionData.time_limit_minutes} onExpire={handleSubmit} />
           </div>
         </header>
 
-        <div className="flex flex-1 overflow-hidden">
+        {/* ── DESKTOP 3-column layout (md+) ── */}
+        <div className="hidden md:flex flex-1 overflow-hidden">
 
-          {/* LEFT sidebar — question navigator */}
-          <div className="w-52 bg-white border-r border-slate-200 p-4 flex flex-col gap-3 shadow-sm overflow-y-auto">
+          {/* Left — navigator */}
+          <div className="w-52 bg-white border-r border-slate-200 p-4 flex flex-col gap-3 overflow-y-auto">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Questions</p>
             <div className="flex flex-wrap gap-1.5">
               {questions.map((question, i) => (
@@ -442,44 +439,33 @@ export default function TestRoom() {
                 </button>
               ))}
             </div>
-            <div className="space-y-1.5 text-xs text-slate-400 mt-1">
+            <div className="space-y-1 text-xs text-slate-400">
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-500 inline-block" /> Answered ({answeredCount})</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-slate-900 inline-block" /> Current</span>
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-slate-100 border inline-block" /> Unanswered ({questions.length - answeredCount})</span>
             </div>
-            {/* Submit shortcut */}
             <button onClick={() => setShowConfirm(true)}
               className="mt-auto w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">
               Submit Test ✓
             </button>
           </div>
 
-          {/* CENTER — question content */}
+          {/* Center — question */}
           <div className="flex-1 overflow-y-auto p-6">
-            <div className="max-w-2xl mx-auto space-y-5">
+            <div className="max-w-2xl mx-auto space-y-4">
               <div className="flex items-center justify-between text-sm text-slate-500">
                 <span>Question {currentQ + 1} of {questions.length}</span>
                 <span className="text-green-600 font-medium">{answeredCount} answered</span>
               </div>
               <ProgressBar current={currentQ + 1} total={questions.length} />
-
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <QuestionCard
-                  question={q}
-                  selectedOption={answers[q.id]}
-                  onSelect={handleAnswer}
-                  index={currentQ}
-                />
+                <QuestionCard question={q} selectedOption={answers[q.id]} onSelect={handleAnswer} index={currentQ} />
               </div>
-
-              <div className="flex justify-between gap-3">
-                <button onClick={() => setCurrentQ(Math.max(0, currentQ - 1))}
-                  disabled={currentQ === 0}
+              <div className="flex gap-3">
+                <button onClick={() => setCurrentQ(Math.max(0, currentQ - 1))} disabled={currentQ === 0}
                   className="flex-1 py-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium hover:bg-slate-50 disabled:opacity-40 transition">
                   ← Previous
                 </button>
-                <button onClick={() => setCurrentQ(Math.min(questions.length - 1, currentQ + 1))}
-                  disabled={isLast}
+                <button onClick={() => setCurrentQ(Math.min(questions.length - 1, currentQ + 1))} disabled={isLast}
                   className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition disabled:opacity-40">
                   Next →
                 </button>
@@ -487,68 +473,127 @@ export default function TestRoom() {
             </div>
           </div>
 
-          {/* RIGHT sidebar — camera & stats */}
-          <div className="w-52 bg-white border-l border-slate-200 p-4 flex flex-col gap-4 shadow-sm">
+          {/* Right — camera & stats */}
+          <div className="w-52 bg-white border-l border-slate-200 p-4 flex flex-col gap-4">
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Live Camera</p>
               <div className="rounded-xl overflow-hidden bg-slate-900 aspect-video">
                 <WebcamMonitor videoRef={videoRef} />
               </div>
             </div>
-
-            <AntiCheat
-              sessionId={sessionData.session_id}
-              videoRef={videoRef}
-              onBlock={(reason) => {
-                showWarningOverlay(`BLOCKED: ${reason}`)
-                clearInterval(snapshotTimer.current)
-                setStep(STEPS.SUSPENDED)
-                if (document.fullscreenElement) document.exitFullscreen()
-              }}
-            />
-
+            <AntiCheat sessionId={sessionData.session_id} videoRef={videoRef}
+              onBlock={(reason) => { showWarningOverlay(`BLOCKED: ${reason}`); clearInterval(snapshotTimer.current); setStep(STEPS.SUSPENDED); if (document.fullscreenElement) document.exitFullscreen() }} />
             <div className="bg-slate-50 rounded-xl p-3 space-y-2 text-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Warnings</span>
-                <span className={`font-bold ${warningCount >= 3 ? 'text-red-600' : 'text-slate-700'}`}>{warningCount}/{MAX_WARNINGS}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Answered</span>
-                <span className="font-bold text-slate-700">{answeredCount}/{questions.length}</span>
-              </div>
+              <div className="flex justify-between"><span className="text-slate-500">Warnings</span><span className={`font-bold ${warningCount >= 3 ? 'text-red-600' : ''}`}>{warningCount}/{MAX_WARNINGS}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Answered</span><span className="font-bold">{answeredCount}/{questions.length}</span></div>
             </div>
-
             <div>
               <p className="text-xs text-slate-400 mb-1">Violation level</p>
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full transition-all ${
-                  warningCount === 0 ? 'bg-green-400'
-                  : warningCount <= 2 ? 'bg-yellow-400'
-                  : 'bg-red-500'}`}
+                <div className={`h-full rounded-full transition-all ${warningCount === 0 ? 'bg-green-400' : warningCount <= 2 ? 'bg-yellow-400' : 'bg-red-500'}`}
                   style={{ width: `${(warningCount / MAX_WARNINGS) * 100}%` }} />
               </div>
             </div>
           </div>
         </div>
 
+        {/* ── MOBILE layout (below md) ── */}
+        <div className="flex md:hidden flex-col flex-1 overflow-hidden">
+          {/* Question area — full width, scrollable */}
+          <div className="flex-1 overflow-y-auto px-3 pt-3 pb-24">
+            <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+              <span>Q {currentQ + 1}/{questions.length}</span>
+              <span className="text-green-600 font-medium">{answeredCount} answered</span>
+            </div>
+            <ProgressBar current={currentQ + 1} total={questions.length} />
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mt-3">
+              <QuestionCard question={q} selectedOption={answers[q.id]} onSelect={handleAnswer} index={currentQ} />
+            </div>
+          </div>
+
+          {/* Floating camera — small, top-right corner, non-blocking */}
+          <div className="fixed top-14 right-2 w-24 z-30 rounded-xl overflow-hidden shadow-lg border border-slate-600">
+            <WebcamMonitor videoRef={videoRef} />
+            <AntiCheat sessionId={sessionData.session_id} videoRef={videoRef}
+              onBlock={(reason) => { showWarningOverlay(`BLOCKED: ${reason}`); clearInterval(snapshotTimer.current); setStep(STEPS.SUSPENDED); if (document.fullscreenElement) document.exitFullscreen() }} />
+          </div>
+
+          {/* Fixed bottom nav bar */}
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-3 py-2 z-20 shadow-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <button onClick={() => setCurrentQ(Math.max(0, currentQ - 1))} disabled={currentQ === 0}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium disabled:opacity-40">
+                ← Prev
+              </button>
+              <button onClick={() => setShowNavModal(true)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold">
+                {currentQ + 1}/{questions.length}
+              </button>
+              {isLast ? (
+                <button onClick={() => setShowConfirm(true)}
+                  className="flex-1 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold">
+                  Submit ✓
+                </button>
+              ) : (
+                <button onClick={() => setCurrentQ(Math.min(questions.length - 1, currentQ + 1))}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold">
+                  Next →
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile question navigator modal */}
+        {showNavModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:hidden" onClick={() => setShowNavModal(false)}>
+            <div className="bg-white w-full rounded-t-3xl p-5 max-h-[70vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-4">
+                <p className="font-semibold text-slate-800">Question Navigator</p>
+                <button onClick={() => setShowNavModal(false)} className="text-slate-400"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {questions.map((question, i) => (
+                  <button key={i} onClick={() => { setCurrentQ(i); setShowNavModal(false) }}
+                    className={`w-10 h-10 rounded-xl text-sm font-semibold transition ${
+                      i === currentQ ? 'bg-slate-900 text-white'
+                      : answers[question.id] ? 'bg-green-500 text-white'
+                      : 'bg-slate-100 text-slate-600'
+                    }`}>
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-3 text-xs text-slate-400 mb-4">
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-500 inline-block" /> Answered ({answeredCount})</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-slate-100 border inline-block" /> Left ({questions.length - answeredCount})</span>
+              </div>
+              <button onClick={() => { setShowNavModal(false); setShowConfirm(true) }}
+                className="w-full py-3 rounded-2xl bg-green-600 text-white font-semibold">
+                Submit Test ✓
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Submit confirm modal */}
         {showConfirm && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl">
               <h3 className="text-xl font-bold text-slate-900 mb-2">Submit Test?</h3>
               <p className="text-slate-500 mb-2">
                 You've answered <strong className="text-slate-800">{answeredCount}</strong> of <strong className="text-slate-800">{questions.length}</strong> questions.
               </p>
               {answeredCount < questions.length && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 text-sm text-amber-700">
-                  ⚠️ {questions.length - answeredCount} question(s) unanswered — they will be marked as wrong.
+                  ⚠️ {questions.length - answeredCount} unanswered — will be marked wrong.
                 </div>
               )}
-              <p className="text-slate-400 text-sm mb-6">Once submitted, you cannot change your answers.</p>
+              <p className="text-slate-400 text-sm mb-5">Once submitted, you cannot change your answers.</p>
               <div className="flex gap-3">
                 <button onClick={() => setShowConfirm(false)}
-                  className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition">
-                  Review Answers
+                  className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-medium">
+                  Review
                 </button>
                 <button onClick={handleSubmit} disabled={submitting}
                   className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold transition">
