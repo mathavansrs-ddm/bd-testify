@@ -241,20 +241,18 @@ export default function MonitoringDashboard() {
       {selected && (
         <div className="fixed inset-0 bg-black/50 flex justify-end z-50">
           <div className="bg-white w-full max-w-3xl h-full overflow-y-auto p-8">
-            <div className="flex justify-between mb-6">
-              <div className="flex items-start gap-4">
-                {/* Pre-test captured photo */}
-                <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-100 border-2 border-gray-200 flex-shrink-0 flex items-center justify-center">
+            {/* Header */}
+            <div className="flex justify-between items-start mb-5">
+              <div className="flex items-start gap-3">
+                {/* Pre-test photo */}
+                <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0 flex items-center justify-center">
                   {(detail?.session?.photo_data || selected.photo_data)
-                    ? <img src={detail?.session?.photo_data || selected.photo_data} alt={selected.candidate_name} className="w-full h-full object-cover" />
-                    : <div className="flex flex-col items-center justify-center gap-1 text-gray-400">
-                        <Camera className="w-6 h-6" />
-                        <span className="text-xs">No photo</span>
-                      </div>
+                    ? <img src={detail?.session?.photo_data || selected.photo_data} alt="photo" className="w-full h-full object-cover" />
+                    : <Camera className="w-5 h-5 text-gray-300" />
                   }
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold">{selected.candidate_name}</h3>
+                  <h3 className="text-lg font-semibold leading-tight">{selected.candidate_name}</h3>
                   <p className="text-sm text-gray-400">{selected.candidate_email}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium
@@ -272,6 +270,26 @@ export default function MonitoringDashboard() {
               <button onClick={() => { setSelected(null); setDetail(null); setFraudLog([]) }}>
                 <X className="w-5 h-5 text-gray-400" />
               </button>
+            </div>
+
+            {/* Live camera snapshot */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <p className="font-semibold text-gray-800 text-sm">Live Camera</p>
+                {selected.snapshot_at && (
+                  <span className="text-xs text-gray-400">Last frame: {new Date(selected.snapshot_at).toLocaleTimeString()}</span>
+                )}
+              </div>
+              <div className="bg-slate-900 rounded-2xl overflow-hidden aspect-video flex items-center justify-center">
+                {selected.latest_snapshot
+                  ? <img src={selected.latest_snapshot} alt="live" className="w-full h-full object-cover" />
+                  : <div className="text-center text-white/40">
+                      <Camera className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">No snapshot yet</p>
+                      <p className="text-xs opacity-60 mt-1">Snapshots upload every 30s during the test</p>
+                    </div>
+                }
+              </div>
             </div>
 
             {/* Violations */}
