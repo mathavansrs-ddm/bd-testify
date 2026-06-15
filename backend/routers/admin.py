@@ -395,10 +395,10 @@ def get_candidate(id: int, db: Session = Depends(get_db), admin=Depends(get_curr
 
 @router.put("/candidates/{id}/reattempt")
 def allow_reattempt(id: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
-    import uuid
+    import uuid, os
     from datetime import timedelta
-    from routers.invite import FRONTEND_URL
     from services.email_service import send_invite_email
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
     candidate = db.query(models.Candidate).filter(models.Candidate.id == id).first()
     if not candidate:
@@ -411,7 +411,7 @@ def allow_reattempt(id: int, db: Session = Depends(get_db), admin=Depends(get_cu
     # Find the last test set this candidate was invited for
     last_invite = db.query(models.TestInvite).filter(
         models.TestInvite.candidate_email == candidate.email
-    ).order_by(models.TestInvite.created_at.desc()).first()
+    ).order_by(models.TestInvite.sent_at.desc()).first()
 
     new_link = None
     if last_invite:
@@ -421,10 +421,10 @@ def allow_reattempt(id: int, db: Session = Depends(get_db), admin=Depends(get_cu
             token=token,
             test_set_id=last_invite.test_set_id,
             expires_at=datetime.utcnow() + timedelta(hours=48),
-            created_by=admin.id,
+            invited_by_admin=admin.id,
         )
         db.add(new_invite)
-        new_link = f"{FRONTEND_URL}/register?token={token}"
+        new_link = f"{frontend_url}/register?token={token}"
         try:
             send_invite_email(candidate.email, candidate.name, new_link, "48 hours")
         except Exception:
