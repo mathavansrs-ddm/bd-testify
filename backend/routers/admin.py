@@ -114,71 +114,78 @@ async def bulk_upload_questions(
     test_set_id: Optional[int] = None,
 ):
     """Upload questions via CSV/Excel."""
-    content = await file.read()
-    filename = file.filename or ''
+    import traceback
     try:
-        if filename.lower().endswith('.xlsx') or filename.lower().endswith('.xls'):
-            df = pd.read_excel(io.BytesIO(content))
-            rows = df.fillna('').astype(str).to_dict('records')
-        else:
+        content = await file.read()
+        filename = file.filename or ''
+        try:
+            if filename.lower().endswith('.xlsx') or filename.lower().endswith('.xls'):
+                df = pd.read_excel(io.BytesIO(content))
+                rows = df.fillna('').astype(str).to_dict('records')
+            else:
+                try:
+                    text = content.decode('utf-8-sig')
+                except Exception:
+                    text = content.decode('latin-1')
+                reader = csv.DictReader(io.StringIO(text))
+                rows = list(reader)
+            if not rows:
+                raise HTTPException(status_code=400, detail="File is empty or has no data rows")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Could not parse file: {e}")
+
+        created, errors = [], []
+        for i, row in enumerate(rows, 1):
             try:
-                text = content.decode('utf-8-sig')
-            except Exception:
-                text = content.decode('latin-1')
-            reader = csv.DictReader(io.StringIO(text))
-            rows = list(reader)
-        if not rows:
-            raise HTTPException(status_code=400, detail="File is empty or has no data rows")
+                # Normalize keys and values
+                row = {
+                    k.strip().lower().replace(' ', '_'): str(v).strip() if v is not None and str(v).strip() not in ('nan', 'None', '') else ''
+                    for k, v in row.items()
+                }
+                # Validate required fields
+                missing = [f for f in ['question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer'] if not row.get(f)]
+                if missing:
+                    raise ValueError(f"Missing fields: {', '.join(missing)}")
+
+                correct = row['correct_answer'].strip().lower()
+                if correct not in ('a', 'b', 'c', 'd'):
+                    raise ValueError(f"correct_answer must be a/b/c/d, got '{correct}'")
+
+                raw_ts = row.get('test_set_id', '').split('.')[0]
+                ts_id = test_set_id or (int(raw_ts) if raw_ts.isdigit() else None)
+                if not ts_id:
+                    raise ValueError("test_set_id is required. Select a test set before uploading or include it in the CSV.")
+
+                q = models.Question(
+                    question_text=row['question_text'],
+                    option_a=row['option_a'],
+                    option_b=row['option_b'],
+                    option_c=row['option_c'],
+                    option_d=row['option_d'],
+                    correct_answer=correct,
+                    marks=int(float(row.get('marks') or 1)),
+                    test_set_id=ts_id,
+                    created_by=admin.id,
+                )
+                db.add(q)
+                created.append(i)
+            except Exception as e:
+                errors.append({"row": i, "error": str(e)})
+
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+        return {"created": len(created), "errors": errors}
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Could not parse file: {e}")
-
-    created, errors = [], []
-    for i, row in enumerate(rows, 1):
-        try:
-            # Normalize keys and values
-            row = {
-                k.strip().lower().replace(' ', '_'): str(v).strip() if v is not None and str(v).strip() not in ('nan', 'None', '') else ''
-                for k, v in row.items()
-            }
-            # Validate required fields
-            missing = [f for f in ['question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer'] if not row.get(f)]
-            if missing:
-                raise ValueError(f"Missing fields: {', '.join(missing)}")
-
-            correct = row['correct_answer'].strip().lower()
-            if correct not in ('a', 'b', 'c', 'd'):
-                raise ValueError(f"correct_answer must be a/b/c/d, got '{correct}'")
-
-            raw_ts = row.get('test_set_id', '').split('.')[0]
-            ts_id = test_set_id or (int(raw_ts) if raw_ts.isdigit() else None)
-            if not ts_id:
-                raise ValueError("test_set_id is required. Select a test set before uploading or include it in the CSV.")
-
-            q = models.Question(
-                question_text=row['question_text'],
-                option_a=row['option_a'],
-                option_b=row['option_b'],
-                option_c=row['option_c'],
-                option_d=row['option_d'],
-                correct_answer=correct,
-                marks=int(float(row.get('marks') or 1)),
-                test_set_id=ts_id,
-                created_by=admin.id,
-            )
-            db.add(q)
-            created.append(i)
-        except Exception as e:
-            errors.append({"row": i, "error": str(e)})
-
-    try:
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Database error while saving questions: {str(e)}")
-
-    return {"created": len(created), "errors": errors}
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {traceback.format_exc()}")
 
 
 @router.post("/test-sets", response_model=schemas.TestSetOut)
