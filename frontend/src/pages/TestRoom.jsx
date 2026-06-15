@@ -7,7 +7,7 @@ import Timer from '../components/Timer'
 import ProgressBar from '../components/ProgressBar'
 import WebcamMonitor from '../components/Webcam'
 import AntiCheat from '../components/AntiCheat'
-import { AlertTriangle, CheckCircle, Camera } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Camera, Shield, Eye, Clock } from 'lucide-react'
 
 const STEPS = { SYSTEM_CHECK: 'system_check', TEST: 'test', FINISHED: 'finished', ERROR: 'error', SUSPENDED: 'suspended' }
 const MAX_WARNINGS = 5
@@ -32,58 +32,58 @@ export default function TestRoom() {
 
   const videoRef = useRef(null)
   const tabSwitchCount = useRef(0)
+  const lastTabSwitch = useRef(0)
 
-  // Anti-cheat: fullscreen, tab visibility, keyboard shortcuts
+  // Medium-sensitivity anti-cheat
   useEffect(() => {
     if (step !== STEPS.TEST) return
 
+    // Only count tab switches (not window blur which double-fires)
     function handleVisibility() {
       if (document.hidden) {
+        const now = Date.now()
+        // Debounce: ignore if within 2 seconds of last switch
+        if (now - lastTabSwitch.current < 2000) return
+        lastTabSwitch.current = now
         tabSwitchCount.current += 1
         reportEvent('tab_switch')
-        showWarningOverlay(`Tab switch detected!`, warningCount + 1)
-        if (tabSwitchCount.current >= MAX_WARNINGS) {
-          autoSuspend()
-        }
+        showWarningOverlay('Tab switch detected! Stay on the test page.')
       }
     }
 
-    function handleBlur() {
-      reportEvent('tab_switch')
-    }
-
-    function handleContextMenu(e) { e.preventDefault() }
-
+    // Block only clear cheating shortcuts (not Ctrl+C for normal use)
     function handleKeyDown(e) {
       const blocked = (
-        (e.ctrlKey && ['c', 'v', 'u', 'a'].includes(e.key.toLowerCase())) ||
+        (e.ctrlKey && ['u'].includes(e.key.toLowerCase())) || // view source
         e.key === 'F12' ||
-        (e.ctrlKey && e.shiftKey && ['i', 'j', 'c'].includes(e.key.toLowerCase()))
+        (e.ctrlKey && e.shiftKey && ['i', 'j'].includes(e.key.toLowerCase())) // devtools
       )
       if (blocked) {
         e.preventDefault()
         reportEvent('copy_attempt')
-        showWarningOverlay('Keyboard shortcuts are disabled during the test.', warningCount + 1)
+        showWarningOverlay('Developer tools are not allowed during the test.')
       }
     }
 
+    // Fullscreen exit: just show a warning, don't count as violation immediately
     function handleFullscreenChange() {
       if (!document.fullscreenElement) {
-        reportEvent('fullscreen_exit')
-        showWarningOverlay('Please return to fullscreen mode to continue.', warningCount + 1)
-        document.documentElement.requestFullscreen().catch(() => {})
+        showWarningOverlay('Please stay in fullscreen mode.', false)
+        setTimeout(() => {
+          document.documentElement.requestFullscreen().catch(() => {})
+        }, 1000)
       }
     }
 
+    function handleContextMenu(e) { e.preventDefault() }
+
     document.addEventListener('visibilitychange', handleVisibility)
-    window.addEventListener('blur', handleBlur)
     document.addEventListener('contextmenu', handleContextMenu)
     document.addEventListener('keydown', handleKeyDown)
     document.addEventListener('fullscreenchange', handleFullscreenChange)
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility)
-      window.removeEventListener('blur', handleBlur)
       document.removeEventListener('contextmenu', handleContextMenu)
       document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
@@ -99,9 +99,9 @@ export default function TestRoom() {
     } catch {}
   }
 
-  function showWarningOverlay(msg, count) {
-    const displayCount = count ?? (warningCount + 1)
-    setWarningMsg(`⚠️ Warning ${displayCount}/${MAX_WARNINGS}: ${msg}`)
+  // countAsViolation=true means it logs to backend, false means just show UI warning
+  function showWarningOverlay(msg, countAsViolation = true) {
+    setWarningMsg(msg)
     setShowWarning(true)
     setTimeout(() => setShowWarning(false), 5000)
   }
@@ -132,16 +132,15 @@ export default function TestRoom() {
     try {
       await document.documentElement.requestFullscreen()
     } catch {
-      toast.error('Fullscreen is required. Please allow fullscreen access.')
+      toast.error('Please allow fullscreen access to start the test.')
       return
     }
-
     try {
       const r = await startTest(token)
       setSessionData(r.data)
       setStep(STEPS.TEST)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to start test')
+      setError(err.response?.data?.detail || 'Failed to start test. Please check your invite link.')
       setStep(STEPS.ERROR)
     }
   }
@@ -164,203 +163,273 @@ export default function TestRoom() {
       setStep(STEPS.FINISHED)
       if (document.fullscreenElement) document.exitFullscreen()
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Submit failed')
+      toast.error(err.response?.data?.detail || 'Submit failed. Please try again.')
     } finally {
       setSubmitting(false)
     }
   }
 
-  // System check screen
+  // ── System Check ─────────────────────────────────────────────
   if (step === STEPS.SYSTEM_CHECK) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-navy-900 to-navy-700 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">System Check</h1>
-          <p className="text-gray-500 mb-6">Before starting, please verify your system and read the test rules.</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-slate-900 to-blue-900 px-8 py-6 text-white">
+            <div className="flex items-center gap-3 mb-1">
+              <Shield className="w-6 h-6 text-blue-300" />
+              <h1 className="text-xl font-bold">BD Testify</h1>
+            </div>
+            <p className="text-white/60 text-sm">System check before your assessment</p>
+          </div>
 
-          <div className="space-y-4 mb-6">
-            {/* Live camera preview */}
-            <div className="rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center">
+          <div className="p-8">
+            {/* Camera preview */}
+            <div className="rounded-2xl overflow-hidden bg-slate-900 aspect-video flex items-center justify-center mb-4 shadow-inner">
               {cameraOk ? (
                 <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
               ) : (
-                <div className="text-center text-white/50 p-6">
-                  <Camera className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm">Camera preview will appear here</p>
+                <div className="text-center text-white/40 p-6">
+                  <Camera className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                  <p className="text-sm">Your camera preview will appear here</p>
                 </div>
               )}
             </div>
 
-            <div className={`flex items-center gap-3 p-3 rounded-lg border ${cameraOk ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}>
-              <Camera className={`w-5 h-5 ${cameraOk ? 'text-green-600' : 'text-orange-500'}`} />
-              <span className={`text-sm font-medium ${cameraOk ? 'text-green-700' : 'text-orange-700'}`}>
-                {cameraOk ? '✓ Camera & microphone ready' : 'Camera & microphone required — click Test'}
+            {/* Camera status */}
+            <div className={`flex items-center gap-3 p-4 rounded-xl border mb-6 ${cameraOk ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
+              <Camera className={`w-5 h-5 flex-shrink-0 ${cameraOk ? 'text-green-600' : 'text-amber-500'}`} />
+              <span className={`text-sm font-medium flex-1 ${cameraOk ? 'text-green-700' : 'text-amber-700'}`}>
+                {cameraOk ? '✓ Camera & microphone verified' : 'Camera & microphone check required'}
               </span>
               {!cameraOk && (
-                <button onClick={checkCamera} disabled={checkingCamera} className="ml-auto text-sm bg-orange-500 hover:bg-orange-600 text-white py-1 px-3 rounded-lg">
-                  {checkingCamera ? 'Testing…' : 'Test Now'}
+                <button onClick={checkCamera} disabled={checkingCamera}
+                  className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium py-1.5 px-4 rounded-lg transition">
+                  {checkingCamera ? 'Checking…' : 'Verify Now'}
                 </button>
               )}
             </div>
-          </div>
 
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-            <h3 className="font-semibold text-amber-900 mb-2">⚠️ Test Rules</h3>
-            <ul className="text-sm text-amber-800 space-y-1">
-              <li>• The test must be taken in fullscreen mode</li>
-              <li>• Do not switch tabs or minimize the browser</li>
-              <li>• Keep your face visible to the webcam throughout</li>
-              <li>• Right-click and keyboard shortcuts are disabled</li>
-              <li>• 3 violations will automatically suspend your test</li>
-              <li>• Do not allow others near the screen</li>
-            </ul>
-          </div>
+            {/* Rules */}
+            <div className="bg-slate-50 rounded-2xl p-5 mb-6">
+              <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                <Eye className="w-4 h-4" /> Test Rules
+              </h3>
+              <ul className="text-sm text-slate-600 space-y-2">
+                {[
+                  'Test runs in fullscreen — do not exit',
+                  'Do not switch tabs or open other windows',
+                  'Keep your face clearly visible to the camera',
+                  `${MAX_WARNINGS} violations will suspend your test automatically`,
+                  'Right-click and developer tools are disabled',
+                ].map((rule, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-blue-500 font-bold mt-0.5">{i + 1}.</span> {rule}
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-          <button
-            onClick={startTestSession}
-            disabled={!cameraOk}
-            className="btn-primary w-full py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {cameraOk ? 'Start Test in Fullscreen →' : 'Test Camera First'}
-          </button>
+            <button onClick={startTestSession} disabled={!cameraOk}
+              className={`w-full py-4 rounded-2xl font-semibold text-base transition ${
+                cameraOk
+                  ? 'bg-gradient-to-r from-slate-900 to-blue-900 text-white hover:opacity-90 shadow-lg'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}>
+              {cameraOk ? 'Start Test in Fullscreen →' : 'Verify Camera to Continue'}
+            </button>
+          </div>
         </div>
       </div>
     )
   }
 
+  // ── Error ─────────────────────────────────────────────────────
   if (step === STEPS.ERROR) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow p-8 max-w-md text-center">
-          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Error</h2>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow p-10 max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Unable to Start Test</h2>
           <p className="text-gray-500">{error}</p>
         </div>
       </div>
     )
   }
 
+  // ── Suspended ─────────────────────────────────────────────────
   if (step === STEPS.SUSPENDED) {
     return (
       <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow p-8 max-w-md text-center border-t-4 border-red-500">
-          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Test Suspended</h2>
-          <p className="text-gray-600">Your test has been suspended due to multiple violations of the exam rules. Please contact the administrator for further assistance.</p>
+        <div className="bg-white rounded-3xl shadow p-10 max-w-md text-center border-t-4 border-red-500">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-8 h-8 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">Test Suspended</h2>
+          <p className="text-gray-500">Your test has been suspended due to multiple rule violations. Please contact your exam administrator for assistance.</p>
         </div>
       </div>
     )
   }
 
+  // ── Finished ──────────────────────────────────────────────────
   if (step === STEPS.FINISHED && result) {
     const passed = result.pass_fail === 'Pass'
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-md text-center">
-          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${passed ? 'bg-green-100' : 'bg-red-100'}`}>
-            {passed ? <CheckCircle className="w-10 h-10 text-green-600" /> : <AlertTriangle className="w-10 h-10 text-red-500" />}
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-blue-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-md w-full text-center">
+          <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 ${passed ? 'bg-green-100' : 'bg-red-100'}`}>
+            {passed
+              ? <CheckCircle className="w-12 h-12 text-green-600" />
+              : <AlertTriangle className="w-12 h-12 text-red-500" />}
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">{passed ? 'Congratulations!' : 'Test Completed'}</h1>
-          <p className="text-gray-500 mb-8">{passed ? 'You have passed the assessment!' : 'Thank you for completing the assessment.'}</p>
-
-          <div className="bg-gray-50 rounded-xl p-6 mb-6">
-            <p className="text-5xl font-bold text-navy-900 mb-2">{result.score}/{result.total}</p>
-            <p className="text-2xl text-gray-600">{result.percentage?.toFixed(1)}%</p>
-            <span className={`inline-block mt-3 px-4 py-1 rounded-full text-sm font-bold ${passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">
+            {passed ? 'Congratulations!' : 'Test Completed'}
+          </h1>
+          <p className="text-gray-500 mb-8">
+            {passed ? 'You have passed the assessment!' : 'Thank you for taking the assessment.'}
+          </p>
+          <div className="bg-slate-50 rounded-2xl p-6 mb-6">
+            <p className="text-6xl font-bold text-slate-900 mb-1">{result.score}<span className="text-3xl text-slate-400">/{result.total}</span></p>
+            <p className="text-2xl text-slate-500 mb-3">{result.percentage?.toFixed(1)}%</p>
+            <span className={`inline-block px-6 py-2 rounded-full text-sm font-bold ${passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
               {result.pass_fail}
             </span>
           </div>
-
-          <p className="text-sm text-gray-400">Your result has been emailed to you. The administrator will review your session.</p>
+          <p className="text-sm text-gray-400">Your result has been sent to your email. The administrator will review your session.</p>
         </div>
       </div>
     )
   }
 
-  // Main test UI
+  // ── Main Test UI ──────────────────────────────────────────────
   if (step === STEPS.TEST && sessionData) {
     const questions = sessionData.questions
     const q = questions[currentQ]
     const isLast = currentQ === questions.length - 1
+    const answeredCount = Object.keys(answers).length
 
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col select-none">
+      <div className="min-h-screen bg-slate-100 flex flex-col select-none">
+
         {/* Warning overlay */}
         {showWarning && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 max-w-md">
-            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-            <div>
-              <p className="font-bold">Warning!</p>
-              <p className="text-sm">{warningMsg}</p>
-              <p className="text-xs mt-1 opacity-80">Warnings: {warningCount}/3</p>
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-bounce-once">
+            <div className="bg-red-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-start gap-3 max-w-sm border border-red-400">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-sm">Rule Violation — Warning {warningCount}/{MAX_WARNINGS}</p>
+                <p className="text-sm opacity-90 mt-0.5">{warningMsg}</p>
+                {warningCount >= 3 && (
+                  <p className="text-xs mt-1 opacity-75 font-semibold">⚠️ Test will be suspended at {MAX_WARNINGS} warnings!</p>
+                )}
+              </div>
             </div>
           </div>
         )}
 
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="font-bold text-navy-900 text-lg">BD Testify</h1>
-            <p className="text-xs text-gray-400">{sessionData.test_set_name}</p>
+        {/* Top header */}
+        <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
+              <Shield className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-slate-900 text-sm leading-tight">BD Testify</p>
+              <p className="text-xs text-slate-400">{sessionData.test_set_name}</p>
+            </div>
           </div>
-          <Timer totalMinutes={sessionData.time_limit_minutes} onExpire={handleSubmit} />
+
+          <div className="flex items-center gap-4">
+            {/* Warning indicator */}
+            <div className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full ${
+              warningCount === 0 ? 'bg-green-100 text-green-700'
+              : warningCount <= 2 ? 'bg-yellow-100 text-yellow-700'
+              : 'bg-red-100 text-red-700'}`}>
+              <AlertTriangle className="w-3 h-3" />
+              {warningCount}/{MAX_WARNINGS} warnings
+            </div>
+            <Timer totalMinutes={sessionData.time_limit_minutes} onExpire={handleSubmit} />
+          </div>
         </header>
 
         <div className="flex flex-1 overflow-hidden">
-          {/* Left panel - question */}
-          <div className="flex-1 overflow-y-auto p-8">
-            <div className="max-w-2xl mx-auto space-y-6">
+          {/* Main question area */}
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-2xl mx-auto space-y-5">
+              {/* Progress */}
+              <div className="flex items-center justify-between text-sm text-slate-500 mb-1">
+                <span>Question {currentQ + 1} of {questions.length}</span>
+                <span className="text-green-600 font-medium">{answeredCount} answered</span>
+              </div>
               <ProgressBar current={currentQ + 1} total={questions.length} />
-              <QuestionCard
-                question={q}
-                selectedOption={answers[q.id]}
-                onSelect={handleAnswer}
-                index={currentQ}
-              />
-              <div className="flex justify-between">
-                <button
-                  onClick={() => setCurrentQ(Math.max(0, currentQ - 1))}
+
+              {/* Question card */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <QuestionCard
+                  question={q}
+                  selectedOption={answers[q.id]}
+                  onSelect={handleAnswer}
+                  index={currentQ}
+                />
+              </div>
+
+              {/* Navigation */}
+              <div className="flex justify-between gap-3">
+                <button onClick={() => setCurrentQ(Math.max(0, currentQ - 1))}
                   disabled={currentQ === 0}
-                  className="btn-secondary disabled:opacity-40"
-                >
+                  className="flex-1 py-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium hover:bg-slate-50 disabled:opacity-40 transition">
                   ← Previous
                 </button>
                 {isLast ? (
-                  <button onClick={() => setShowConfirm(true)} className="btn-primary">
-                    Submit Test →
+                  <button onClick={() => setShowConfirm(true)}
+                    className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold transition">
+                    Submit Test ✓
                   </button>
                 ) : (
-                  <button onClick={() => setCurrentQ(currentQ + 1)} className="btn-primary">
+                  <button onClick={() => setCurrentQ(currentQ + 1)}
+                    className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition">
                     Next →
                   </button>
                 )}
               </div>
 
               {/* Question navigator */}
-              <div className="bg-white rounded-xl p-4 border border-gray-100">
-                <p className="text-xs text-gray-400 mb-3 font-medium">QUESTION NAVIGATOR</p>
+              <div className="bg-white rounded-2xl p-5 border border-slate-200">
+                <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide mb-3">Question Navigator</p>
                 <div className="flex flex-wrap gap-2">
                   {questions.map((question, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setCurrentQ(i)}
-                      className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
-                        i === currentQ ? 'bg-navy-900 text-white'
-                        : answers[question.id] ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                      }`}
-                    >
+                    <button key={i} onClick={() => setCurrentQ(i)}
+                      className={`w-9 h-9 rounded-lg text-sm font-semibold transition ${
+                        i === currentQ ? 'bg-slate-900 text-white shadow'
+                        : answers[question.id] ? 'bg-green-500 text-white'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}>
                       {i + 1}
                     </button>
                   ))}
+                </div>
+                <div className="flex gap-4 mt-3 text-xs text-slate-400">
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-500 inline-block" /> Answered</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-slate-900 inline-block" /> Current</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-slate-100 border inline-block" /> Unanswered</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right panel - webcam & AI */}
-          <div className="w-64 bg-white border-l border-gray-200 p-4 flex flex-col gap-4">
-            <WebcamMonitor videoRef={videoRef} />
+          {/* Right sidebar — camera & stats */}
+          <div className="w-56 bg-white border-l border-slate-200 p-4 flex flex-col gap-4 shadow-sm">
+            {/* Camera */}
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Live Camera</p>
+              <div className="rounded-xl overflow-hidden bg-slate-900 aspect-video">
+                <WebcamMonitor videoRef={videoRef} />
+              </div>
+            </div>
+
             <AntiCheat
               sessionId={sessionData.session_id}
               videoRef={videoRef}
@@ -370,30 +439,60 @@ export default function TestRoom() {
                 if (document.fullscreenElement) document.exitFullscreen()
               }}
             />
-            <div className="text-xs text-gray-400 space-y-1">
-              <div className="flex justify-between"><span>Warnings</span><span className={warningCount > 1 ? 'text-red-500 font-bold' : ''}>{warningCount}/3</span></div>
-              <div className="flex justify-between"><span>Answered</span><span>{Object.keys(answers).length}/{questions.length}</span></div>
+
+            {/* Stats */}
+            <div className="bg-slate-50 rounded-xl p-3 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Warnings</span>
+                <span className={`font-bold ${warningCount >= 3 ? 'text-red-600' : 'text-slate-700'}`}>{warningCount}/{MAX_WARNINGS}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Answered</span>
+                <span className="font-bold text-slate-700">{answeredCount}/{questions.length}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" /> Question</span>
+                <span className="font-bold text-slate-700">{currentQ + 1}/{questions.length}</span>
+              </div>
+            </div>
+
+            {/* Warning level bar */}
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Violation level</p>
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all ${
+                  warningCount === 0 ? 'bg-green-400'
+                  : warningCount <= 2 ? 'bg-yellow-400'
+                  : 'bg-red-500'}`}
+                  style={{ width: `${(warningCount / MAX_WARNINGS) * 100}%` }} />
+              </div>
             </div>
           </div>
         </div>
 
         {/* Submit confirm modal */}
         {showConfirm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
-              <h3 className="text-xl font-semibold mb-2">Submit Test?</h3>
-              <p className="text-gray-500 mb-2">
-                You've answered <strong>{Object.keys(answers).length}</strong> of <strong>{questions.length}</strong> questions.
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Submit Test?</h3>
+              <p className="text-slate-500 mb-2">
+                You've answered <strong className="text-slate-800">{answeredCount}</strong> of <strong className="text-slate-800">{questions.length}</strong> questions.
               </p>
-              {Object.keys(answers).length < questions.length && (
-                <p className="text-amber-600 text-sm mb-4">⚠️ {questions.length - Object.keys(answers).length} question(s) unanswered.</p>
+              {answeredCount < questions.length && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 text-sm text-amber-700">
+                  ⚠️ {questions.length - answeredCount} question(s) unanswered — they will be marked as wrong.
+                </div>
               )}
-              <p className="text-gray-500 text-sm mb-6">Once submitted, you cannot change your answers.</p>
+              <p className="text-slate-400 text-sm mb-6">Once submitted, you cannot change your answers.</p>
               <div className="flex gap-3">
-                <button onClick={handleSubmit} disabled={submitting} className="btn-primary flex-1">
+                <button onClick={() => setShowConfirm(false)}
+                  className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition">
+                  Review Answers
+                </button>
+                <button onClick={handleSubmit} disabled={submitting}
+                  className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold transition">
                   {submitting ? 'Submitting…' : 'Yes, Submit'}
                 </button>
-                <button onClick={() => setShowConfirm(false)} className="btn-secondary flex-1">Review Answers</button>
               </div>
             </div>
           </div>
