@@ -35,6 +35,7 @@ export default function TestRoom() {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const snapshotTimer = useRef(null)
+  const streamRef = useRef(null)
   const tabSwitchCount = useRef(0)
   const lastTabSwitch = useRef(0)
 
@@ -117,10 +118,18 @@ export default function TestRoom() {
     if (document.fullscreenElement) document.exitFullscreen()
   }
 
+  // Reattach stream whenever video element mounts after cameraOk=true
+  useEffect(() => {
+    if (cameraOk && streamRef.current && videoRef.current && !photoCaptured) {
+      videoRef.current.srcObject = streamRef.current
+    }
+  }, [cameraOk, photoCaptured])
+
   async function checkCamera() {
     setCheckingCamera(true)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      streamRef.current = stream
       if (videoRef.current) {
         videoRef.current.srcObject = stream
       }
