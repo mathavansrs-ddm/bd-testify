@@ -83,6 +83,8 @@ export const logEvent = (data) => api.post('/monitoring/event', data)
 export const fraudBlock = (data) => api.post('/monitoring/fraud-block', data)
 export const getActiveSessions = (status = null) => api.get('/monitoring/active-sessions', { params: status ? { status } : {} })
 export const getFraudLog = (sessionId) => api.get(`/monitoring/fraud-log/${sessionId}`)
+export const uploadSnapshot = (data) => api.post('/monitoring/snapshot', data)
+export const uploadPhoto = (data) => api.post('/monitoring/photo', data)
 
 // Candidates — admin actions
 export const unblockCandidate = (id) => api.put(`/admin/candidates/${id}/unblock`)

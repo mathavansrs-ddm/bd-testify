@@ -21,6 +21,16 @@ class FraudBlockRequest(BaseModel):
     reason: str
 
 
+class SnapshotRequest(BaseModel):
+    session_id: int
+    image: str   # base64 data-URL
+
+
+class PhotoRequest(BaseModel):
+    session_id: int
+    image: str   # base64 data-URL
+
+
 @router.post("/event")
 async def log_event(data: schemas.MonitoringEvent, db: Session = Depends(get_db)):
     session = db.query(models.TestSession).filter(models.TestSession.id == data.session_id).first()
@@ -120,6 +130,29 @@ def get_fraud_log(session_id: int, db: Session = Depends(get_db), admin=Depends(
     ]
 
 
+@router.post("/snapshot")
+async def save_snapshot(data: SnapshotRequest, db: Session = Depends(get_db)):
+    """Called by test-taker browser every 30s to upload a webcam frame."""
+    session = db.query(models.TestSession).filter(models.TestSession.id == data.session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session.latest_snapshot = data.image
+    session.snapshot_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/photo")
+async def save_photo(data: PhotoRequest, db: Session = Depends(get_db)):
+    """Store the pre-test captured photo for a session."""
+    session = db.query(models.TestSession).filter(models.TestSession.id == data.session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    session.photo_data = data.image
+    db.commit()
+    return {"ok": True}
+
+
 @router.get("/active-sessions")
 def get_active_sessions(status: Optional[str] = None, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
     if status == "completed":
@@ -148,5 +181,8 @@ def get_active_sessions(status: Optional[str] = None, db: Session = Depends(get_
             "score": s.score if hasattr(s, 'score') else None,
             "is_blocked": candidate.is_blocked if candidate else False,
             "block_reason": candidate.block_reason if candidate else None,
+            "latest_snapshot": s.latest_snapshot,
+            "snapshot_at": s.snapshot_at,
+            "photo_data": s.photo_data,
         })
     return result

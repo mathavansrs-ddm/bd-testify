@@ -42,7 +42,11 @@ export default function InviteManager() {
     setLoading(true)
     try {
       const r = await sendInvite({ candidate_email: email.trim(), test_set_id: +testSetId })
-      toast.success(`Invite sent to ${email}`)
+      if (r.data.email_sent === false) {
+        toast.error(`Email delivery failed — copy the link from Invite History to share manually.`, { duration: 8000 })
+      } else {
+        toast.success(`Invite sent to ${email}`)
+      }
       setEmail('')
       loadHistory()
     } catch (err) { toast.error(err.response?.data?.detail || 'Failed to send invite') }

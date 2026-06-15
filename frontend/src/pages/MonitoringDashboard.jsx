@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, AlertTriangle, Eye, X, CheckCircle, StopCircle, ShieldOff, Activity, Clock } from 'lucide-react'
+import { RefreshCw, AlertTriangle, Eye, X, CheckCircle, StopCircle, ShieldOff, Activity, Clock, Camera } from 'lucide-react'
 import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
 import { getActiveSessions, getAdminSession, markSessionReviewed, suspendTest, getFraudLog } from '../services/api'
@@ -17,6 +17,7 @@ const MAX_WARNINGS = 5
 
 export default function MonitoringDashboard() {
   const [tab, setTab] = useState('ongoing')
+  const [cameraRefresh, setCameraRefresh] = useState(0)
   const [sessions, setSessions] = useState([])
   const [selected, setSelected] = useState(null)
   const [detail, setDetail] = useState(null)
@@ -24,7 +25,9 @@ export default function MonitoringDashboard() {
 
   useEffect(() => {
     load()
-    const id = setInterval(() => { if (tab === 'ongoing') load() }, 10000)
+    const id = setInterval(() => {
+      if (tab === 'ongoing' || tab === 'cameras') load()
+    }, 10000)
     return () => clearInterval(id)
   }, [tab])
 
@@ -93,6 +96,11 @@ export default function MonitoringDashboard() {
                 ${tab === 'completed' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
               <Clock className="w-4 h-4 text-blue-500" /> Completed
             </button>
+            <button onClick={() => { setTab('cameras'); setSelected(null) }}
+              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors
+                ${tab === 'cameras' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              <Camera className="w-4 h-4 text-purple-500" /> Camera View
+            </button>
           </div>
           <button onClick={load} className="btn-secondary flex items-center gap-2">
             <RefreshCw className="w-4 h-4" /> Refresh
@@ -106,6 +114,67 @@ export default function MonitoringDashboard() {
           </div>
         )}
 
+        {/* ── Camera CCTV View ── */}
+        {tab === 'cameras' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-gray-500">Live camera snapshots — auto-refreshes every 10s. Candidates upload frames every 30s.</p>
+              <button onClick={() => { load(); setCameraRefresh(r => r + 1) }} className="btn-secondary flex items-center gap-2 text-sm">
+                <RefreshCw className="w-4 h-4" /> Refresh
+              </button>
+            </div>
+            {sessions.filter(s => s.status === 'started').length === 0 ? (
+              <div className="text-center py-20 text-gray-400">
+                <Camera className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>No active test sessions right now</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {sessions.filter(s => s.status === 'started').map((s) => (
+                  <div key={s.session_id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    {/* Video frame */}
+                    <div className="bg-slate-900 aspect-video flex items-center justify-center relative">
+                      {s.latest_snapshot ? (
+                        <img src={s.latest_snapshot} alt={s.candidate_name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="text-center text-white/40">
+                          <Camera className="w-8 h-8 mx-auto mb-1 opacity-40" />
+                          <p className="text-xs">Waiting for snapshot…</p>
+                        </div>
+                      )}
+                      <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" /> LIVE
+                      </div>
+                      {s.warning_count >= 3 && (
+                        <div className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full font-bold">
+                          ⚠ {s.warning_count}
+                        </div>
+                      )}
+                    </div>
+                    {/* Info */}
+                    <div className="p-3">
+                      <p className="font-semibold text-sm text-gray-900 truncate">{s.candidate_name}</p>
+                      <p className="text-xs text-gray-400 truncate">{s.candidate_email}</p>
+                      <div className="flex justify-between items-center mt-2 text-xs text-gray-500">
+                        <span>{s.elapsed_minutes}m elapsed</span>
+                        <span className={s.warning_count >= 3 ? 'text-red-600 font-bold' : ''}>
+                          {s.warning_count}/5 warns
+                        </span>
+                      </div>
+                      {s.snapshot_at && (
+                        <p className="text-xs text-gray-300 mt-1">
+                          Last frame: {new Date(s.snapshot_at).toLocaleTimeString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className={tab === 'cameras' ? 'hidden' : ''}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {sessions.map((s) => (
             <div key={s.session_id}
@@ -155,6 +224,7 @@ export default function MonitoringDashboard() {
               )}
             </div>
           ))}
+        </div>
         </div>
       </div>
 

@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { startTest, saveAnswer, submitTest, logEvent } from '../services/api'
+import { startTest, saveAnswer, submitTest, logEvent, uploadSnapshot, uploadPhoto } from '../services/api'
 import QuestionCard from '../components/QuestionCard'
 import Timer from '../components/Timer'
 import ProgressBar from '../components/ProgressBar'
 import WebcamMonitor from '../components/Webcam'
 import AntiCheat from '../components/AntiCheat'
-import { AlertTriangle, CheckCircle, Camera, Shield, Eye, Clock } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Camera, Shield, Eye, Clock, RefreshCw } from 'lucide-react'
 
 const STEPS = { SYSTEM_CHECK: 'system_check', TEST: 'test', FINISHED: 'finished', ERROR: 'error', SUSPENDED: 'suspended' }
 const MAX_WARNINGS = 5
@@ -29,8 +29,12 @@ export default function TestRoom() {
   const [error, setError] = useState('')
   const [cameraOk, setCameraOk] = useState(false)
   const [checkingCamera, setCheckingCamera] = useState(false)
+  const [photoCaptured, setPhotoCaptured] = useState(false)
+  const [photoDataUrl, setPhotoDataUrl] = useState(null)
 
   const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+  const snapshotTimer = useRef(null)
   const tabSwitchCount = useRef(0)
   const lastTabSwitch = useRef(0)
 
@@ -107,6 +111,7 @@ export default function TestRoom() {
   }
 
   function autoSuspend() {
+    clearInterval(snapshotTimer.current)
     setStep(STEPS.SUSPENDED)
     toast.error('Your test has been suspended due to violations.')
     if (document.fullscreenElement) document.exitFullscreen()
@@ -128,6 +133,29 @@ export default function TestRoom() {
     }
   }
 
+  function capturePhoto() {
+    const video = videoRef.current
+    if (!video) return
+    const canvas = canvasRef.current || document.createElement('canvas')
+    canvas.width = 320
+    canvas.height = 240
+    canvas.getContext('2d').drawImage(video, 0, 0, 320, 240)
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.7)
+    setPhotoDataUrl(dataUrl)
+    setPhotoCaptured(true)
+  }
+
+  function sendSnapshot(sessionId) {
+    const video = videoRef.current
+    if (!video || !sessionId) return
+    const canvas = document.createElement('canvas')
+    canvas.width = 320
+    canvas.height = 240
+    canvas.getContext('2d').drawImage(video, 0, 0, 320, 240)
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.5)
+    uploadSnapshot({ session_id: sessionId, image: dataUrl }).catch(() => {})
+  }
+
   async function startTestSession() {
     try {
       await document.documentElement.requestFullscreen()
@@ -138,6 +166,14 @@ export default function TestRoom() {
     try {
       const r = await startTest(token)
       setSessionData(r.data)
+      const sid = r.data.session_id
+      // Upload pre-test photo
+      if (photoDataUrl) {
+        uploadPhoto({ session_id: sid, image: photoDataUrl }).catch(() => {})
+      }
+      // Start periodic snapshot every 30s
+      sendSnapshot(sid)
+      snapshotTimer.current = setInterval(() => sendSnapshot(sid), 30000)
       setStep(STEPS.TEST)
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to start test. Please check your invite link.')
@@ -157,6 +193,7 @@ export default function TestRoom() {
   async function handleSubmit() {
     setShowConfirm(false)
     setSubmitting(true)
+    clearInterval(snapshotTimer.current)
     try {
       const r = await submitTest(sessionData.session_id)
       setResult(r.data)
@@ -184,9 +221,16 @@ export default function TestRoom() {
           </div>
 
           <div className="p-8">
-            {/* Camera preview */}
-            <div className="rounded-2xl overflow-hidden bg-slate-900 aspect-video flex items-center justify-center mb-4 shadow-inner">
-              {cameraOk ? (
+            {/* Camera preview / captured photo */}
+            <div className="rounded-2xl overflow-hidden bg-slate-900 aspect-video flex items-center justify-center mb-4 shadow-inner relative">
+              {photoCaptured && photoDataUrl ? (
+                <>
+                  <img src={photoDataUrl} alt="Captured" className="w-full h-full object-cover" />
+                  <div className="absolute bottom-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" /> Photo captured
+                  </div>
+                </>
+              ) : cameraOk ? (
                 <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
               ) : (
                 <div className="text-center text-white/40 p-6">
@@ -195,9 +239,10 @@ export default function TestRoom() {
                 </div>
               )}
             </div>
+            <canvas ref={canvasRef} className="hidden" />
 
             {/* Camera status */}
-            <div className={`flex items-center gap-3 p-4 rounded-xl border mb-6 ${cameraOk ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
+            <div className={`flex items-center gap-3 p-4 rounded-xl border mb-3 ${cameraOk ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
               <Camera className={`w-5 h-5 flex-shrink-0 ${cameraOk ? 'text-green-600' : 'text-amber-500'}`} />
               <span className={`text-sm font-medium flex-1 ${cameraOk ? 'text-green-700' : 'text-amber-700'}`}>
                 {cameraOk ? '✓ Camera & microphone verified' : 'Camera & microphone check required'}
@@ -209,6 +254,20 @@ export default function TestRoom() {
                 </button>
               )}
             </div>
+
+            {/* Photo capture */}
+            {cameraOk && (
+              <div className={`flex items-center gap-3 p-4 rounded-xl border mb-3 ${photoCaptured ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50'}`}>
+                <Camera className={`w-5 h-5 flex-shrink-0 ${photoCaptured ? 'text-green-600' : 'text-blue-500'}`} />
+                <span className={`text-sm font-medium flex-1 ${photoCaptured ? 'text-green-700' : 'text-blue-700'}`}>
+                  {photoCaptured ? '✓ Identity photo captured' : 'Capture your photo for identity verification'}
+                </span>
+                <button onClick={capturePhoto}
+                  className={`text-white text-sm font-medium py-1.5 px-4 rounded-lg transition flex items-center gap-1 ${photoCaptured ? 'bg-slate-400 hover:bg-slate-500' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                  {photoCaptured ? <><RefreshCw className="w-3 h-3" /> Retake</> : 'Capture'}
+                </button>
+              </div>
+            )}
 
             {/* Rules */}
             <div className="bg-slate-50 rounded-2xl p-5 mb-6">
@@ -230,13 +289,13 @@ export default function TestRoom() {
               </ul>
             </div>
 
-            <button onClick={startTestSession} disabled={!cameraOk}
+            <button onClick={startTestSession} disabled={!cameraOk || !photoCaptured}
               className={`w-full py-4 rounded-2xl font-semibold text-base transition ${
-                cameraOk
+                cameraOk && photoCaptured
                   ? 'bg-gradient-to-r from-slate-900 to-blue-900 text-white hover:opacity-90 shadow-lg'
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed'
               }`}>
-              {cameraOk ? 'Start Test in Fullscreen →' : 'Verify Camera to Continue'}
+              {!cameraOk ? 'Verify Camera to Continue' : !photoCaptured ? 'Capture Photo to Continue' : 'Start Test in Fullscreen →'}
             </button>
           </div>
         </div>

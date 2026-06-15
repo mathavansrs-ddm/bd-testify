@@ -162,6 +162,9 @@ class TestSession(Base):
     is_reviewed = Column(Boolean, default=False)
     ip_address = Column(String, nullable=True)
     browser_info = Column(String, nullable=True)
+    photo_data = Column(Text, nullable=True)       # pre-test captured photo (base64)
+    latest_snapshot = Column(Text, nullable=True)  # latest CCTV frame (base64)
+    snapshot_at = Column(DateTime, nullable=True)
 
     candidate = relationship("Candidate", back_populates="sessions")
     test_set = relationship("TestSet", back_populates="sessions")

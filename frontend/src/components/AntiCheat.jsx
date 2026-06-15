@@ -2,9 +2,9 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { logEvent, fraudBlock } from '../services/api'
 
 const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model'
-const FACE_MATCH_THRESHOLD = 0.55   // Euclidean distance — lower = stricter
-const NO_FACE_BLOCK_AFTER = 3       // consecutive no-face strikes before block
-const FRAUD_BLOCK_AFTER  = 2        // fraud strikes (multiple faces / impersonation) before block
+const FACE_MATCH_THRESHOLD = 0.65   // Euclidean distance — lower = stricter
+const NO_FACE_BLOCK_AFTER = 8       // consecutive no-face strikes before block (~24s)
+const FRAUD_BLOCK_AFTER  = 5        // fraud strikes (multiple faces / impersonation) before block
 const AUDIO_SPIKE_THRESHOLD = 0.18  // RMS amplitude 0–1
 const AUDIO_SPIKE_SECONDS  = 4      // sustained spike duration before flagging
 
