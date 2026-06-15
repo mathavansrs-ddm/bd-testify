@@ -52,36 +52,41 @@ def _create_invite(candidate_email: str, test_set_id: int, admin_id: int, db: Se
     return invite
 
 
-@router.post("/send", response_model=schemas.InviteOut)
+@router.post("/send")
 def send_invite(data: schemas.InviteSend, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
     """Send invite to a single email. Candidate does NOT need to be pre-registered."""
-    invite = _create_invite(data.candidate_email, data.test_set_id, admin.id, db)
-    db.commit()
-    db.refresh(invite)
-
-    candidate = db.query(models.Candidate).filter(models.Candidate.email == data.candidate_email).first()
-    name = candidate.name if candidate else data.candidate_email
-    link = f"{FRONTEND_URL}/register?token={invite.token}"
-    email_error = None
+    import traceback
     try:
-        send_invite_email(to_email=data.candidate_email, candidate_name=name, test_link=link, expires_in="48 hours")
-    except Exception as e:
-        email_error = str(e)
+        invite = _create_invite(data.candidate_email, data.test_set_id, admin.id, db)
+        db.commit()
+        db.refresh(invite)
 
-    # Return extra fields so frontend can show link & warn if email failed
-    response = {
-        "id": invite.id,
-        "candidate_email": invite.candidate_email,
-        "token": invite.token,
-        "test_set_id": invite.test_set_id,
-        "sent_at": invite.sent_at,
-        "expires_at": invite.expires_at,
-        "is_used": invite.is_used,
-        "test_link": link,
-        "email_sent": email_error is None,
-        "email_error": email_error,
-    }
-    return response
+        candidate = db.query(models.Candidate).filter(models.Candidate.email == data.candidate_email).first()
+        name = candidate.name if candidate else data.candidate_email
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        link = f"{frontend_url}/register?token={invite.token}"
+        email_error = None
+        try:
+            send_invite_email(to_email=data.candidate_email, candidate_name=name, test_link=link, expires_in="48 hours")
+        except Exception as e:
+            email_error = str(e)
+
+        return {
+            "id": invite.id,
+            "candidate_email": invite.candidate_email,
+            "token": invite.token,
+            "test_set_id": invite.test_set_id,
+            "sent_at": str(invite.sent_at),
+            "expires_at": str(invite.expires_at),
+            "is_used": invite.is_used,
+            "test_link": link,
+            "email_sent": email_error is None,
+            "email_error": email_error,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Invite error: {traceback.format_exc()}")
 
 
 @router.post("/bulk-send")
