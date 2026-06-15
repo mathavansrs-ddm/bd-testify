@@ -61,7 +61,7 @@ class Admin(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=True)
     hashed_password = Column(String, nullable=False)
-    role = Column(Enum(AdminRole), default=AdminRole.superadmin, nullable=False)
+    role = Column(Enum(AdminRole, native_enum=False), default=AdminRole.superadmin, nullable=False)
     is_active = Column(Boolean, default=True)
     created_by = Column(Integer, ForeignKey("admins.id"), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
