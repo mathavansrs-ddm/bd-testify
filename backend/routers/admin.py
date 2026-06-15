@@ -621,34 +621,44 @@ def get_settings(admin=Depends(get_current_admin)):
 @router.delete("/cleanup/load-test")
 def cleanup_load_test(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
     """Remove all load-test candidates and their associated data (emails ending in @bdtest.invalid)."""
-    candidates = db.query(models.Candidate).filter(
-        models.Candidate.email.like("%@bdtest.invalid")
-    ).all()
+    try:
+        conn = db.connection()
 
-    deleted_candidates = 0
-    deleted_sessions = 0
-    deleted_invites = 0
+        # Get candidate IDs and emails for load test accounts
+        rows = conn.execute(
+            __import__('sqlalchemy').text("SELECT id, email FROM candidates WHERE email LIKE '%@bdtest.invalid'")
+        ).fetchall()
 
-    for c in candidates:
-        # Delete child rows first to avoid FK violations
-        sessions = db.query(models.TestSession).filter(models.TestSession.candidate_id == c.id).all()
-        for s in sessions:
-            db.query(models.CheatingLog).filter(models.CheatingLog.session_id == s.id).delete(synchronize_session=False)
-            db.query(models.Answer).filter(models.Answer.session_id == s.id).delete(synchronize_session=False)
-            db.delete(s)
-            deleted_sessions += 1
+        if not rows:
+            return {"deleted_candidates": 0, "deleted_sessions": 0, "deleted_invites": 0}
 
-        invites = db.query(models.TestInvite).filter(models.TestInvite.candidate_email == c.email).all()
-        for inv in invites:
-            db.delete(inv)
-            deleted_invites += 1
+        candidate_ids = [r[0] for r in rows]
+        candidate_emails = [r[1] for r in rows]
 
-        db.delete(c)
-        deleted_candidates += 1
+        # Get session IDs for those candidates
+        placeholders = ','.join(str(i) for i in candidate_ids)
+        session_rows = conn.execute(
+            __import__('sqlalchemy').text(f"SELECT id FROM test_sessions WHERE candidate_id IN ({placeholders})")
+        ).fetchall()
+        session_ids = [r[0] for r in session_rows]
 
-    db.commit()
-    return {
-        "deleted_candidates": deleted_candidates,
-        "deleted_sessions": deleted_sessions,
-        "deleted_invites": deleted_invites,
-    }
+        # Delete in FK-safe order: deepest children first
+        if session_ids:
+            sid_list = ','.join(str(i) for i in session_ids)
+            conn.execute(__import__('sqlalchemy').text(f"DELETE FROM cheating_logs WHERE session_id IN ({sid_list})"))
+            conn.execute(__import__('sqlalchemy').text(f"DELETE FROM answers WHERE session_id IN ({sid_list})"))
+            conn.execute(__import__('sqlalchemy').text(f"DELETE FROM test_sessions WHERE id IN ({sid_list})"))
+
+        email_list = ','.join(f"'{e}'" for e in candidate_emails)
+        conn.execute(__import__('sqlalchemy').text(f"DELETE FROM test_invites WHERE candidate_email IN ({email_list})"))
+        conn.execute(__import__('sqlalchemy').text(f"DELETE FROM candidates WHERE id IN ({placeholders})"))
+
+        db.commit()
+        return {
+            "deleted_candidates": len(candidate_ids),
+            "deleted_sessions": len(session_ids),
+            "deleted_invites": len(candidate_emails),
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
