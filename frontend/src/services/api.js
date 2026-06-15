@@ -59,7 +59,7 @@ export const exportResults = () => api.get('/admin/export/results', { responseTy
 // Invites
 export const sendInvite = (data) => api.post('/invite/send', data)
 export const bulkSendInvites = (data) => api.post('/invite/bulk-send', data)
-export const generateQR = (test_set_id = null) => api.post('/invite/qr/generate', null, { params: test_set_id ? { test_set_id } : {} })
+export const generateQR = (test_set_id = null, candidate_type = null) => api.post('/invite/qr/generate', null, { params: { ...(test_set_id ? { test_set_id } : {}), ...(candidate_type ? { candidate_type } : {}) } })
 export const bulkUploadQuestions = (formData, test_set_id = null) => api.post('/admin/questions/bulk-upload', formData, { params: test_set_id ? { test_set_id } : {} })
 export const submitQREmail = (data) => api.post('/invite/qr/submit-email', data)
 export const validateToken = (token) => api.get(`/invite/validate/${token}`)

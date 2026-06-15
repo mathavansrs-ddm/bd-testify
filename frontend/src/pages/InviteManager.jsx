@@ -69,11 +69,12 @@ export default function InviteManager() {
   }
 
   const [qrTestSetId, setQrTestSetId] = useState('')
+  const [qrCandidateType, setQrCandidateType] = useState('')
 
   async function handleGenerateQR() {
     setLoading(true)
     try {
-      const r = await generateQR(qrTestSetId ? +qrTestSetId : null)
+      const r = await generateQR(qrTestSetId ? +qrTestSetId : null, qrCandidateType || null)
       setQrImage(r.data.qr_image)
     }
     catch { toast.error('Failed to generate QR') }
@@ -247,6 +248,17 @@ export default function InviteManager() {
             {!qrImage ? (
               <div className="space-y-4">
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Candidate Type</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[['', 'Both (ask on scan)'], ['student', 'Student only'], ['employee', 'Employee only']].map(([val, label]) => (
+                      <button key={val} onClick={() => setQrCandidateType(val)}
+                        className={`py-2 px-3 rounded-lg text-xs font-medium border transition ${qrCandidateType === val ? 'bg-slate-900 text-white border-slate-900' : 'border-gray-200 text-gray-600 hover:border-slate-400'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Select Test (optional)</label>
                   <select className="input-field" value={qrTestSetId} onChange={(e) => setQrTestSetId(e.target.value)}>
                     <option value="">— Any active test —</option>
@@ -254,9 +266,6 @@ export default function InviteManager() {
                       <option key={s.id} value={s.id}>{s.set_name} ({s.time_limit_minutes} min)</option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-400 mt-1">
-                    If selected, the QR will link candidates directly to that specific test.
-                  </p>
                 </div>
                 <button onClick={handleGenerateQR} disabled={loading}
                   className="btn-primary w-full flex items-center justify-center gap-2">
@@ -265,11 +274,18 @@ export default function InviteManager() {
               </div>
             ) : (
               <div className="space-y-4">
-                {qrTestSetId && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700">
-                    Linked to: <strong>{testSets.find(s => s.id == qrTestSetId)?.set_name}</strong>
-                  </div>
-                )}
+                <div className="flex gap-2 flex-wrap">
+                  {qrTestSetId && (
+                    <span className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-1 text-xs text-blue-700">
+                      Test: <strong>{testSets.find(s => s.id == qrTestSetId)?.set_name}</strong>
+                    </span>
+                  )}
+                  {qrCandidateType && (
+                    <span className="bg-purple-50 border border-purple-200 rounded-lg px-3 py-1 text-xs text-purple-700">
+                      Type: <strong className="capitalize">{qrCandidateType}</strong> only
+                    </span>
+                  )}
+                </div>
                 <div className="border-2 border-gray-100 rounded-xl p-4 text-center bg-white">
                   <img src={qrImage} alt="QR Code" className="mx-auto" style={{ maxWidth: 280 }} />
                 </div>
@@ -278,7 +294,7 @@ export default function InviteManager() {
                     className="btn-primary flex-1 flex items-center justify-center gap-2">
                     <Download className="w-4 h-4" /> Download PNG
                   </button>
-                  <button onClick={() => { setQrImage(null); setQrTestSetId('') }} className="btn-secondary flex-1">Regenerate</button>
+                  <button onClick={() => { setQrImage(null); setQrTestSetId(''); setQrCandidateType('') }} className="btn-secondary flex-1">Regenerate</button>
                 </div>
               </div>
             )}

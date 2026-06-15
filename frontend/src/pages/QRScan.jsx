@@ -5,9 +5,10 @@ import { ClipboardList, Mail, GraduationCap, Briefcase, CheckCircle } from 'luci
 
 export default function QRScan() {
   const [params] = useSearchParams()
-  const testSetId = params.get('test') // test-specific QR passes ?test=ID
+  const testSetId = params.get('test')
+  const presetType = params.get('type') // 'student' | 'employee' | null
 
-  const [type, setType] = useState(null)
+  const [type, setType] = useState(presetType || null)
   const [form, setForm] = useState({})
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -89,9 +90,14 @@ export default function QRScan() {
         ) : (
           <>
             <div className="flex items-center gap-2 mb-5">
-              <button onClick={() => { setType(null); setForm({}) }}
-                className="text-sm text-blue-600 hover:underline">← Back</button>
-              <span className="text-sm text-gray-400">|</span>
+              {/* Hide back button if type was pre-set via QR URL */}
+              {!presetType && (
+                <>
+                  <button onClick={() => { setType(null); setForm({}) }}
+                    className="text-sm text-blue-600 hover:underline">← Back</button>
+                  <span className="text-sm text-gray-400">|</span>
+                </>
+              )}
               <span className="text-sm font-medium text-gray-700">
                 {type === 'student' ? '🎓 Student Registration' : '💼 Employee Registration'}
               </span>

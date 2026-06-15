@@ -130,11 +130,13 @@ def bulk_send_invites(data: schemas.BulkInviteSend, db: Session = Depends(get_db
 
 
 @router.post("/qr/generate")
-def generate_qr_code(test_set_id: int = None, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+def generate_qr_code(test_set_id: int = None, candidate_type: str = None, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    params = []
     if test_set_id:
-        qr_url = f"{FRONTEND_URL}/qr-landing?test={test_set_id}"
-    else:
-        qr_url = f"{FRONTEND_URL}/qr-landing"
+        params.append(f"test={test_set_id}")
+    if candidate_type in ("student", "employee"):
+        params.append(f"type={candidate_type}")
+    qr_url = f"{FRONTEND_URL}/qr-landing" + (f"?{'&'.join(params)}" if params else "")
     qr_base64 = generate_qr(qr_url)
     return {"qr_image": qr_base64, "url": qr_url}
 
