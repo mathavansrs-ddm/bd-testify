@@ -136,22 +136,51 @@ async def bulk_upload_questions(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Could not parse file: {e}")
 
+        # Column name aliases — accept many common variations
+        ALIASES = {
+            'question_text': ['question_text', 'question', 'q', 'questions', 'question text'],
+            'option_a': ['option_a', 'option a', 'a', 'opt_a', 'choice_a', 'choice a'],
+            'option_b': ['option_b', 'option b', 'b', 'opt_b', 'choice_b', 'choice b'],
+            'option_c': ['option_c', 'option c', 'c', 'opt_c', 'choice_c', 'choice c'],
+            'option_d': ['option_d', 'option d', 'd', 'opt_d', 'choice_d', 'choice d'],
+            'correct_answer': ['correct_answer', 'correct answer', 'answer', 'ans', 'correct', 'key'],
+            'marks': ['marks', 'mark', 'score', 'points'],
+            'test_set_id': ['test_set_id', 'test set id', 'testset', 'set_id', 'set id'],
+        }
+
+        def normalize_row(raw):
+            # Normalize keys
+            normalized = {
+                k.strip().lower().replace(' ', '_'): str(v).strip() if v is not None and str(v).strip() not in ('nan', 'None', '') else ''
+                for k, v in raw.items()
+            }
+            result = {}
+            for field, aliases in ALIASES.items():
+                for alias in aliases:
+                    alias_key = alias.replace(' ', '_')
+                    if alias_key in normalized:
+                        result[field] = normalized[alias_key]
+                        break
+                else:
+                    result[field] = normalized.get(field, '')
+            return result
+
         created, errors = [], []
         for i, row in enumerate(rows, 1):
             try:
-                # Normalize keys and values
-                row = {
-                    k.strip().lower().replace(' ', '_'): str(v).strip() if v is not None and str(v).strip() not in ('nan', 'None', '') else ''
-                    for k, v in row.items()
-                }
+                row = normalize_row(row)
                 # Validate required fields
                 missing = [f for f in ['question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer'] if not row.get(f)]
                 if missing:
                     raise ValueError(f"Missing fields: {', '.join(missing)}")
 
                 correct = row['correct_answer'].strip().lower()
+                # Accept "Option A", "A", "a", "1","2","3","4"
+                correct_map = {'1': 'a', '2': 'b', '3': 'c', '4': 'd',
+                               'option a': 'a', 'option b': 'b', 'option c': 'c', 'option d': 'd'}
+                correct = correct_map.get(correct, correct)
                 if correct not in ('a', 'b', 'c', 'd'):
-                    raise ValueError(f"correct_answer must be a/b/c/d, got '{correct}'")
+                    raise ValueError(f"correct_answer must be a/b/c/d, got '{row['correct_answer']}'")
 
                 raw_ts = row.get('test_set_id', '').split('.')[0]
                 ts_id = test_set_id or (int(raw_ts) if raw_ts.isdigit() else None)
