@@ -8,6 +8,7 @@ import os
 
 load_dotenv()
 
+from sqlalchemy import text
 from database import engine, Base, SessionLocal
 import models
 from auth import get_password_hash
@@ -16,6 +17,26 @@ from routers import admin, invite, candidate, test, monitoring
 
 # Create tables at import time (before app starts)
 Base.metadata.create_all(bind=engine)
+
+
+def run_migrations():
+    """Add new columns to existing tables without dropping data."""
+    migrations = [
+        ("test_sessions", "photo_data", "TEXT"),
+        ("test_sessions", "latest_snapshot", "TEXT"),
+        ("test_sessions", "snapshot_at", "DATETIME"),
+    ]
+    with engine.connect() as conn:
+        for table, col, col_type in migrations:
+            try:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                print(f"[MIGRATION] Added {table}.{col}")
+            except Exception:
+                pass  # Column already exists
+
+
+run_migrations()
 
 
 def seed_admin():
