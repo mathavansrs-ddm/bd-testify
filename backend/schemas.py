@@ -51,6 +51,11 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class ChangePassword(BaseModel):
+    current_password: str
+    new_password: str
+
+
 # ── Candidate ─────────────────────────────────────────────────────────────
 class ExternalCandidateCreate(BaseModel):
     """Public self-registration for external (student) candidates."""

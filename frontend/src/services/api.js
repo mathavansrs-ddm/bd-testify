@@ -28,6 +28,7 @@ api.interceptors.response.use(
 
 // Admin
 export const adminLogin = (data) => api.post('/admin/login', data)
+export const changePassword = (data) => api.put('/admin/change-password', data)
 export const getDashboardStats = () => api.get('/admin/dashboard/stats')
 export const getAdminSessions = (status) => api.get('/admin/sessions', { params: { status } })
 export const getAdminSession = (id) => api.get(`/admin/sessions/${id}`)

@@ -203,12 +203,22 @@ export default function TestRoom() {
       const r = await startTest(token)
       setSessionData(r.data)
       const sid = r.data.session_id
+
+      // Upload pre-test photo — retry once on failure so it isn't silently lost
       if (photoDataUrl) {
-        uploadPhoto({ session_id: sid, image: photoDataUrl }).catch(() => {})
+        uploadPhoto({ session_id: sid, image: photoDataUrl }).catch(() => {
+          setTimeout(() => uploadPhoto({ session_id: sid, image: photoDataUrl }).catch(() => {}), 3000)
+        })
       }
-      sendSnapshot(sid)
-      snapshotTimer.current = setInterval(() => sendSnapshot(sid), 5000)
+
+      // Step first so WebcamMonitor mounts and videoRef is attached before first snapshot
       setStep(STEPS.TEST)
+
+      // Small delay lets React commit the new video element before we read it
+      setTimeout(() => {
+        sendSnapshot(sid)
+        snapshotTimer.current = setInterval(() => sendSnapshot(sid), 5000)
+      }, 500)
     } catch (err) {
       if (document.fullscreenElement) document.exitFullscreen()
       const msg = err.response?.data?.detail || 'Failed to start test.'
@@ -430,6 +440,15 @@ export default function TestRoom() {
 
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col select-none">
+
+        {/* Submitting overlay */}
+        {submitting && (
+          <div className="fixed inset-0 bg-black/80 z-[60] flex flex-col items-center justify-center gap-4">
+            <div className="w-14 h-14 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+            <p className="text-white text-lg font-semibold">Submitting your test…</p>
+            <p className="text-white/60 text-sm">Please wait, do not close this tab</p>
+          </div>
+        )}
 
         {/* Warning modal — candidate must acknowledge */}
         {showWarning && (

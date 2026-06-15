@@ -616,3 +616,14 @@ def export_results(db: Session = Depends(get_db), admin=Depends(get_current_admi
 def get_settings(admin=Depends(get_current_admin)):
     """Global settings are now managed per test-set. This endpoint returns info."""
     return {"message": "Settings are configured per test set. Edit each test set individually."}
+
+
+@router.put("/change-password")
+def change_password(data: schemas.ChangePassword, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    if not verify_password(data.current_password, admin.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if len(data.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+    admin.hashed_password = get_password_hash(data.new_password)
+    db.commit()
+    return {"message": "Password changed successfully"}

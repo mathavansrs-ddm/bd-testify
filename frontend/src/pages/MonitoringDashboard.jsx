@@ -284,7 +284,7 @@ export default function MonitoringDashboard() {
               <div>
                 <h3 className="text-lg font-semibold leading-tight">{selected.candidate_name}</h3>
                 <p className="text-sm text-gray-400">{selected.candidate_email}</p>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium
                     ${selected.status === 'submitted' ? 'bg-green-100 text-green-700'
                     : selected.status === 'suspended' ? 'bg-red-100 text-red-700'
@@ -294,6 +294,14 @@ export default function MonitoringDashboard() {
                   <span className={`text-xs font-semibold ${warningColor(selected.warning_count)}`}>
                     {selected.warning_count}/{MAX_WARNINGS} warnings
                   </span>
+                </div>
+                <div className="flex gap-4 mt-2 text-xs text-gray-400">
+                  {selected.started_at && (
+                    <span>Started: <span className="text-gray-600 font-medium">{formatIST(selected.started_at)}</span></span>
+                  )}
+                  {selected.submitted_at && (
+                    <span>Ended: <span className="text-gray-600 font-medium">{formatIST(selected.submitted_at)}</span></span>
+                  )}
                 </div>
               </div>
               <button onClick={() => { setSelected(null); setDetail(null); setFraudLog([]) }}>

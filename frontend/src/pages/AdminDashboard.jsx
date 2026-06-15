@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Users, ClipboardList, BarChart2, Eye, Settings } from 'lucide-react'
+import { Users, ClipboardList, BarChart2, Eye, Settings, KeyRound } from 'lucide-react'
 import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
-import { getDashboardStats, getAdminSessions, updateSettings } from '../services/api'
+import { getDashboardStats, getAdminSessions, updateSettings, changePassword } from '../services/api'
 import { formatIST } from '../utils/dateFormat'
 
 function StatCard({ icon: Icon, label, value, color }) {
@@ -33,11 +33,37 @@ export default function AdminDashboard() {
   const [sessions, setSessions] = useState([])
   const [showSettings, setShowSettings] = useState(false)
   const [settings, setSettings] = useState({ time_limit_minutes: 60, max_attempts: 1, questions_per_test: 30 })
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [pwForm, setPwForm] = useState({ current_password: '', new_password: '', confirm_password: '' })
+  const [pwLoading, setPwLoading] = useState(false)
 
   useEffect(() => {
     getDashboardStats().then((r) => setStats(r.data)).catch(() => {})
     getAdminSessions().then((r) => setSessions(r.data.slice(0, 10))).catch(() => {})
   }, [])
+
+  async function handleChangePassword(e) {
+    e.preventDefault()
+    if (pwForm.new_password !== pwForm.confirm_password) {
+      toast.error('New passwords do not match')
+      return
+    }
+    if (pwForm.new_password.length < 8) {
+      toast.error('New password must be at least 8 characters')
+      return
+    }
+    setPwLoading(true)
+    try {
+      await changePassword({ current_password: pwForm.current_password, new_password: pwForm.new_password })
+      toast.success('Password changed successfully')
+      setShowChangePassword(false)
+      setPwForm({ current_password: '', new_password: '', confirm_password: '' })
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to change password')
+    } finally {
+      setPwLoading(false)
+    }
+  }
 
   async function handleSaveSettings(e) {
     e.preventDefault()
@@ -65,6 +91,9 @@ export default function AdminDashboard() {
         <div className="flex gap-3 flex-wrap">
           <button onClick={() => setShowSettings(true)} className="btn-secondary flex items-center gap-2">
             <Settings className="w-4 h-4" /> Global Settings
+          </button>
+          <button onClick={() => setShowChangePassword(true)} className="btn-secondary flex items-center gap-2">
+            <KeyRound className="w-4 h-4" /> Change Password
           </button>
           <Link to="/admin/invite" className="btn-primary flex items-center gap-2">
             Send Invites
@@ -136,6 +165,41 @@ export default function AdminDashboard() {
               <div className="flex gap-3 pt-2">
                 <button type="submit" className="btn-primary flex-1">Save Settings</button>
                 <button type="button" onClick={() => setShowSettings(false)} className="btn-secondary flex-1">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Change Password modal */}
+      {showChangePassword && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
+            <h3 className="text-xl font-semibold mb-6">Change Admin Password</h3>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                <input type="password" className="input-field" required
+                  value={pwForm.current_password}
+                  onChange={(e) => setPwForm({ ...pwForm, current_password: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                <input type="password" className="input-field" required minLength={8}
+                  value={pwForm.new_password}
+                  onChange={(e) => setPwForm({ ...pwForm, new_password: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                <input type="password" className="input-field" required
+                  value={pwForm.confirm_password}
+                  onChange={(e) => setPwForm({ ...pwForm, confirm_password: e.target.value })} />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="submit" className="btn-primary flex-1" disabled={pwLoading}>
+                  {pwLoading ? 'Changing…' : 'Change Password'}
+                </button>
+                <button type="button" onClick={() => { setShowChangePassword(false); setPwForm({ current_password: '', new_password: '', confirm_password: '' }) }}
+                  className="btn-secondary flex-1">Cancel</button>
               </div>
             </form>
           </div>
