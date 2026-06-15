@@ -65,12 +65,20 @@ export default function QuestionManager() {
     if (!file) return
     const fd = new FormData()
     fd.append('file', file)
-    const params = bulkTestSetId ? `?test_set_id=${bulkTestSetId}` : ''
     try {
       const r = await bulkUploadQuestions(fd, bulkTestSetId || null)
-      toast.success(`Uploaded ${r.data.created} questions${r.data.errors.length ? `, ${r.data.errors.length} errors` : ''}`)
+      const { created, errors } = r.data
+      if (errors.length > 0) {
+        toast.error(`${created} uploaded, ${errors.length} errors: ${errors[0]?.error}`)
+      } else {
+        toast.success(`${created} questions uploaded successfully!`)
+      }
       loadQuestions()
-    } catch (err) { toast.error(err.response?.data?.detail || 'Upload failed') }
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.message || 'Upload failed'
+      toast.error(`Upload error: ${detail}`)
+      console.error('Bulk upload error:', err.response?.data)
+    }
     e.target.value = ''
   }
 
