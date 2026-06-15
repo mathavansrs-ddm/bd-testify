@@ -69,6 +69,8 @@ export default function AntiCheat({ sessionId, videoRef, onBlock }) {
     } catch (_) {}
   }, [sessionId, block])
 
+  const audioCancelledRef = useRef(false)
+
   // ── Audio monitoring ────────────────────────────────────────────────────
   function startAudioMonitor(stream) {
     try {
@@ -81,8 +83,8 @@ export default function AntiCheat({ sessionId, videoRef, onBlock }) {
 
       const buf = new Float32Array(analyser.fftSize)
       function tick() {
-        if (blockedRef.current) return
-        analyser.getFloatTimeDomainData(buf)
+        if (blockedRef.current || audioCancelledRef.current) return
+        try { analyser.getFloatTimeDomainData(buf) } catch { return }
         let rms = 0
         for (const v of buf) rms += v * v
         rms = Math.sqrt(rms / buf.length)
@@ -188,6 +190,7 @@ export default function AntiCheat({ sessionId, videoRef, onBlock }) {
 
     return () => {
       cancelled = true
+      audioCancelledRef.current = true
       clearInterval(detectTimer.current)
       audioCtxRef.current?.close()
     }

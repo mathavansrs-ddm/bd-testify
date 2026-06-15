@@ -139,6 +139,17 @@ export default function TestRoom() {
     }
   }, [step, cameraOk, photoCaptured])
 
+  // Stop camera tracks when test ends to release browser camera indicator
+  useEffect(() => {
+    if (step === STEPS.FINISHED || step === STEPS.SUSPENDED || step === STEPS.ERROR) {
+      clearInterval(snapshotTimer.current)
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
+    }
+  }, [step])
+
   async function checkCamera() {
     setCheckingCamera(true)
     try {
@@ -223,6 +234,7 @@ export default function TestRoom() {
   }, [sessionData, currentQ])
 
   async function handleSubmit() {
+    if (step !== STEPS.TEST || submitting) return
     setShowConfirm(false)
     setSubmitting(true)
     clearInterval(snapshotTimer.current)
@@ -232,7 +244,15 @@ export default function TestRoom() {
       setStep(STEPS.FINISHED)
       if (document.fullscreenElement) document.exitFullscreen()
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Submit failed. Please try again.')
+      const status = err.response?.status
+      const msg = err.response?.data?.detail || 'Submit failed. Please try again.'
+      if (status === 403) {
+        // Session was suspended (e.g., admin action mid-test)
+        setStep(STEPS.SUSPENDED)
+        if (document.fullscreenElement) document.exitFullscreen()
+      } else {
+        toast.error(msg)
+      }
     } finally {
       setSubmitting(false)
     }

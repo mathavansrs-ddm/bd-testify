@@ -134,7 +134,7 @@ export default function MonitoringDashboard() {
           </button>
         </div>
 
-        {sessions.length === 0 && (
+        {sessions.length === 0 && tab !== 'cameras' && (
           <div className="text-center py-20 text-gray-400">
             <Eye className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p>{tab === 'ongoing' ? 'No active test sessions right now' : 'No completed sessions yet'}</p>

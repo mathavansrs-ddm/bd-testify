@@ -42,6 +42,9 @@ def start_test(token: str, request: Request, db: Session = Depends(get_db)):
         models.Question.test_set_id == invite.test_set_id
     ).all()
 
+    if not all_questions:
+        raise HTTPException(status_code=400, detail="This test has no questions yet. Please contact the administrator.")
+
     n = min(test_set.questions_per_test, len(all_questions))
     selected = random.sample(all_questions, n) if len(all_questions) > n else all_questions
 
@@ -130,6 +133,8 @@ def submit_test(session_id: int, db: Session = Depends(get_db)):
 
     if session.status == models.SessionStatus.submitted:
         raise HTTPException(status_code=400, detail="Test already submitted")
+    if session.status == models.SessionStatus.suspended:
+        raise HTTPException(status_code=403, detail="Test has been suspended and cannot be submitted")
 
     score, total, percentage = calculate_score(session_id, db)
     session.score = score
