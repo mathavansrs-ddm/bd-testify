@@ -109,19 +109,28 @@ def delete_question(id: int, db: Session = Depends(get_db), admin=Depends(get_cu
 @router.post("/questions/bulk-upload")
 async def bulk_upload_questions(
     file: UploadFile = File(...),
-    test_set_id: int = None,
     db: Session = Depends(get_db),
-    admin=Depends(get_current_admin)
+    admin=Depends(get_current_admin),
+    test_set_id: Optional[int] = None,
 ):
-    """Upload questions via CSV. Columns: question_text, option_a, option_b, option_c, option_d, correct_answer, marks, test_set_id (optional)"""
+    """Upload questions via CSV/Excel."""
     content = await file.read()
+    filename = file.filename or ''
     try:
-        if file.filename.endswith('.csv'):
-            reader = csv.DictReader(io.StringIO(content.decode('utf-8-sig')))
-            rows = list(reader)
-        else:
+        if filename.lower().endswith('.xlsx') or filename.lower().endswith('.xls'):
             df = pd.read_excel(io.BytesIO(content))
-            rows = df.to_dict('records')
+            rows = df.fillna('').astype(str).to_dict('records')
+        else:
+            try:
+                text = content.decode('utf-8-sig')
+            except Exception:
+                text = content.decode('latin-1')
+            reader = csv.DictReader(io.StringIO(text))
+            rows = list(reader)
+        if not rows:
+            raise HTTPException(status_code=400, detail="File is empty or has no data rows")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not parse file: {e}")
 
@@ -142,8 +151,10 @@ async def bulk_upload_questions(
             if correct not in ('a', 'b', 'c', 'd'):
                 raise ValueError(f"correct_answer must be a/b/c/d, got '{correct}'")
 
-            raw_ts = row.get('test_set_id', '').split('.')[0]  # strip .0 from Excel floats
+            raw_ts = row.get('test_set_id', '').split('.')[0]
             ts_id = test_set_id or (int(raw_ts) if raw_ts.isdigit() else None)
+            if not ts_id:
+                raise ValueError("test_set_id is required. Select a test set before uploading or include it in the CSV.")
 
             q = models.Question(
                 question_text=row['question_text'],
@@ -154,13 +165,19 @@ async def bulk_upload_questions(
                 correct_answer=correct,
                 marks=int(float(row.get('marks') or 1)),
                 test_set_id=ts_id,
+                created_by=admin.id,
             )
             db.add(q)
             created.append(i)
         except Exception as e:
             errors.append({"row": i, "error": str(e)})
 
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error while saving questions: {str(e)}")
+
     return {"created": len(created), "errors": errors}
 
 
