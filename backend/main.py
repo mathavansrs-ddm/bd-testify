@@ -25,6 +25,8 @@ def run_migrations():
         ("test_sessions", "photo_data", "TEXT"),
         ("test_sessions", "latest_snapshot", "TEXT"),
         ("test_sessions", "snapshot_at", "TIMESTAMP"),
+        ("questions", "section_id", "INTEGER REFERENCES sections(id) ON DELETE SET NULL"),
+        ("sections", "order", "INTEGER DEFAULT 0"),
     ]
     with engine.connect() as conn:
         for table, col, col_type in migrations:

@@ -44,8 +44,14 @@ export const deleteQuestion = (id) => api.delete(`/admin/questions/${id}`)
 
 // Test Sets
 export const getTestSets = () => api.get('/admin/test-sets')
+export const getTestSet = (id) => api.get(`/admin/test-sets/${id}`)
 export const createTestSet = (data) => api.post('/admin/test-sets', data)
 export const updateTestSet = (id, data) => api.put(`/admin/test-sets/${id}`, data)
+
+export const getSections = (testSetId) => api.get(`/admin/test-sets/${testSetId}/sections`)
+export const createSection = (testSetId, data) => api.post(`/admin/test-sets/${testSetId}/sections`, data)
+export const updateSection = (testSetId, sectionId, data) => api.put(`/admin/test-sets/${testSetId}/sections/${sectionId}`, data)
+export const deleteSection = (testSetId, sectionId) => api.delete(`/admin/test-sets/${testSetId}/sections/${sectionId}`)
 
 // Candidates — admin
 export const getCandidates = (params) => api.get('/admin/candidates', { params })
@@ -61,7 +67,7 @@ export const exportResults = () => api.get('/admin/export/results', { responseTy
 export const sendInvite = (data) => api.post('/invite/send', data)
 export const bulkSendInvites = (data) => api.post('/invite/bulk-send', data)
 export const generateQR = (test_set_id = null, candidate_type = null) => api.post('/invite/qr/generate', null, { params: { ...(test_set_id ? { test_set_id } : {}), ...(candidate_type ? { candidate_type } : {}) } })
-export const bulkUploadQuestions = (formData, test_set_id = null) => api.post('/admin/questions/bulk-upload', formData, { params: test_set_id ? { test_set_id } : {} })
+export const bulkUploadQuestions = (formData, test_set_id = null, section_id = null) => api.post('/admin/questions/bulk-upload', formData, { params: { ...(test_set_id ? { test_set_id } : {}), ...(section_id ? { section_id } : {}) } })
 export const submitQREmail = (data) => api.post('/invite/qr/submit-email', data)
 export const validateToken = (token) => api.get(`/invite/validate/${token}`)
 export const getInviteHistory = () => api.get('/invite/history')

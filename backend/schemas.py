@@ -120,9 +120,38 @@ class CandidateOut(BaseModel):
         from_attributes = True
 
 
+# ── Section ───────────────────────────────────────────────────────────────
+class SectionCreate(BaseModel):
+    name: str
+    order: int = 0
+    time_limit_minutes: Optional[int] = None
+    questions_per_section: Optional[int] = None
+
+
+class SectionUpdate(BaseModel):
+    name: Optional[str] = None
+    order: Optional[int] = None
+    time_limit_minutes: Optional[int] = None
+    questions_per_section: Optional[int] = None
+
+
+class SectionOut(BaseModel):
+    id: int
+    test_set_id: int
+    name: str
+    order: int
+    time_limit_minutes: Optional[int] = None
+    questions_per_section: Optional[int] = None
+    question_count: Optional[int] = 0
+
+    class Config:
+        from_attributes = True
+
+
 # ── Question ──────────────────────────────────────────────────────────────
 class QuestionCreate(BaseModel):
     test_set_id: int
+    section_id: Optional[int] = None
     question_text: str
     option_a: str
     option_b: str
@@ -141,11 +170,13 @@ class QuestionUpdate(BaseModel):
     correct_answer: Optional[CorrectAnswer] = None
     marks: Optional[int] = None
     test_set_id: Optional[int] = None
+    section_id: Optional[int] = None
 
 
 class QuestionOut(BaseModel):
     id: int
     test_set_id: int
+    section_id: Optional[int] = None
     question_text: str
     option_a: str
     option_b: str
@@ -170,6 +201,13 @@ class QuestionForCandidate(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SectionForCandidate(BaseModel):
+    id: int
+    name: str
+    time_limit_minutes: Optional[int] = None
+    questions: List[QuestionForCandidate]
 
 
 # ── TestSet ───────────────────────────────────────────────────────────────
@@ -263,6 +301,7 @@ class AnswerSubmit(BaseModel):
 class TestStartResponse(BaseModel):
     session_id: int
     questions: List[QuestionForCandidate]
+    sections: Optional[List[SectionForCandidate]] = None
     time_limit_minutes: int
     test_set_name: str
 

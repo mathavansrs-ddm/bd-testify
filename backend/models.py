@@ -101,8 +101,24 @@ class TestSet(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     questions = relationship("Question", back_populates="test_set")
+    sections = relationship("Section", back_populates="test_set", order_by="Section.order")
     sessions = relationship("TestSession", back_populates="test_set")
     invites = relationship("TestInvite", back_populates="test_set")
+
+
+class Section(Base):
+    __tablename__ = "sections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    test_set_id = Column(Integer, ForeignKey("test_sets.id"), nullable=False)
+    name = Column(String, nullable=False)
+    order = Column(Integer, default=0)
+    time_limit_minutes = Column(Integer, nullable=True)      # None = use test set limit
+    questions_per_section = Column(Integer, nullable=True)   # None = use all questions
+    created_at = Column(DateTime, server_default=func.now())
+
+    test_set = relationship("TestSet", back_populates="sections")
+    questions = relationship("Question", back_populates="section")
 
 
 class Question(Base):
@@ -110,6 +126,7 @@ class Question(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     test_set_id = Column(Integer, ForeignKey("test_sets.id"), nullable=False)
+    section_id = Column(Integer, ForeignKey("sections.id"), nullable=True)
     question_text = Column(Text, nullable=False)
     option_a = Column(String, nullable=False)
     option_b = Column(String, nullable=False)
@@ -121,6 +138,7 @@ class Question(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     test_set = relationship("TestSet", back_populates="questions")
+    section = relationship("Section", back_populates="questions")
     answers = relationship("Answer", back_populates="question")
 
 

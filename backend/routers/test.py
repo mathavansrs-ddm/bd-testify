@@ -38,15 +38,52 @@ def start_test(token: str, request: Request, db: Session = Depends(get_db)):
     if not test_set:
         raise HTTPException(status_code=404, detail="Test set not found")
 
-    all_questions = db.query(models.Question).filter(
-        models.Question.test_set_id == invite.test_set_id
-    ).all()
+    sections = db.query(models.Section).filter(
+        models.Section.test_set_id == invite.test_set_id
+    ).order_by(models.Section.order).all()
 
-    if not all_questions:
+    def make_q_out(q):
+        return schemas.QuestionForCandidate(
+            id=q.id, question_text=q.question_text,
+            option_a=q.option_a, option_b=q.option_b,
+            option_c=q.option_c, option_d=q.option_d,
+            marks=q.marks,
+        )
+
+    sections_out = None
+    selected = []
+
+    if sections:
+        # Section mode: draw questions per section, total time = sum of section times
+        sections_out = []
+        total_time = 0
+        for sec in sections:
+            pool = db.query(models.Question).filter(models.Question.section_id == sec.id).all()
+            n = sec.questions_per_section or len(pool)
+            n = min(n, len(pool))
+            drawn = random.sample(pool, n) if len(pool) > n else pool
+            selected.extend(drawn)
+            sec_time = sec.time_limit_minutes or test_set.time_limit_minutes
+            total_time += sec_time
+            sections_out.append(schemas.SectionForCandidate(
+                id=sec.id, name=sec.name,
+                time_limit_minutes=sec.time_limit_minutes,
+                questions=[make_q_out(q) for q in drawn],
+            ))
+        time_limit = total_time
+    else:
+        # Flat mode (no sections): original behaviour
+        all_questions = db.query(models.Question).filter(
+            models.Question.test_set_id == invite.test_set_id
+        ).all()
+        if not all_questions:
+            raise HTTPException(status_code=400, detail="This test has no questions yet. Please contact the administrator.")
+        n = min(test_set.questions_per_test, len(all_questions))
+        selected = random.sample(all_questions, n) if len(all_questions) > n else all_questions
+        time_limit = test_set.time_limit_minutes
+
+    if not selected:
         raise HTTPException(status_code=400, detail="This test has no questions yet. Please contact the administrator.")
-
-    n = min(test_set.questions_per_test, len(all_questions))
-    selected = random.sample(all_questions, n) if len(all_questions) > n else all_questions
 
     invite.is_used = True
     invite.used_at = datetime.utcnow()
@@ -60,7 +97,7 @@ def start_test(token: str, request: Request, db: Session = Depends(get_db)):
         candidate_id=candidate.id,
         test_set_id=invite.test_set_id,
         token=token,
-        time_limit_minutes=test_set.time_limit_minutes,
+        time_limit_minutes=time_limit,
         ip_address=ip_address,
         browser_info=browser_info,
         status=models.SessionStatus.started,
@@ -69,22 +106,11 @@ def start_test(token: str, request: Request, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(session)
 
-    questions_out = [
-        schemas.QuestionForCandidate(
-            id=q.id,
-            question_text=q.question_text,
-            option_a=q.option_a,
-            option_b=q.option_b,
-            option_c=q.option_c,
-            option_d=q.option_d,
-            marks=q.marks,
-        ) for q in selected
-    ]
-
     return {
         "session_id": session.id,
-        "questions": questions_out,
-        "time_limit_minutes": test_set.time_limit_minutes,
+        "questions": [make_q_out(q) for q in selected],
+        "sections": sections_out,
+        "time_limit_minutes": time_limit,
         "test_set_name": test_set.set_name,
     }
 

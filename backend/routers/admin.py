@@ -77,10 +77,12 @@ def create_question(data: schemas.QuestionCreate, db: Session = Depends(get_db),
 
 
 @router.get("/questions", response_model=List[schemas.QuestionOut])
-def list_questions(test_set_id: Optional[int] = None, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+def list_questions(test_set_id: Optional[int] = None, section_id: Optional[int] = None, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
     query = db.query(models.Question)
     if test_set_id:
         query = query.filter(models.Question.test_set_id == test_set_id)
+    if section_id:
+        query = query.filter(models.Question.section_id == section_id)
     return query.all()
 
 
@@ -112,6 +114,7 @@ async def bulk_upload_questions(
     db: Session = Depends(get_db),
     admin=Depends(get_current_admin),
     test_set_id: Optional[int] = None,
+    section_id: Optional[int] = None,
 ):
     """Upload questions via CSV/Excel."""
     import traceback
@@ -196,6 +199,7 @@ async def bulk_upload_questions(
                     correct_answer=correct,
                     marks=int(float(row.get('marks') or 1)),
                     test_set_id=ts_id,
+                    section_id=section_id,
                     created_by=admin.id,
                 )
                 db.add(q)
@@ -239,6 +243,22 @@ def list_test_sets(db: Session = Depends(get_db), admin=Depends(get_current_admi
     return result
 
 
+@router.get("/test-sets/{id}")
+def get_test_set(id: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    ts = db.query(models.TestSet).filter(models.TestSet.id == id).first()
+    if not ts:
+        raise HTTPException(status_code=404, detail="Test set not found")
+    out = schemas.TestSetOut.model_validate(ts)
+    out.question_count = db.query(models.Question).filter(models.Question.test_set_id == ts.id).count()
+    sections = db.query(models.Section).filter(models.Section.test_set_id == id).order_by(models.Section.order).all()
+    sections_out = []
+    for s in sections:
+        so = schemas.SectionOut.model_validate(s)
+        so.question_count = db.query(models.Question).filter(models.Question.section_id == s.id).count()
+        sections_out.append(so)
+    return {"test_set": out, "sections": sections_out}
+
+
 @router.put("/test-sets/{id}", response_model=schemas.TestSetOut)
 def update_test_set(id: int, data: schemas.TestSetUpdate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
     ts = db.query(models.TestSet).filter(models.TestSet.id == id).first()
@@ -251,6 +271,67 @@ def update_test_set(id: int, data: schemas.TestSetUpdate, db: Session = Depends(
     out = schemas.TestSetOut.model_validate(ts)
     out.question_count = db.query(models.Question).filter(models.Question.test_set_id == ts.id).count()
     return out
+
+
+# ── Section endpoints ──────────────────────────────────────────────────────
+
+@router.get("/test-sets/{test_set_id}/sections", response_model=List[schemas.SectionOut])
+def list_sections(test_set_id: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    sections = db.query(models.Section).filter(
+        models.Section.test_set_id == test_set_id
+    ).order_by(models.Section.order).all()
+    result = []
+    for s in sections:
+        so = schemas.SectionOut.model_validate(s)
+        so.question_count = db.query(models.Question).filter(models.Question.section_id == s.id).count()
+        result.append(so)
+    return result
+
+
+@router.post("/test-sets/{test_set_id}/sections", response_model=schemas.SectionOut)
+def create_section(test_set_id: int, data: schemas.SectionCreate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    ts = db.query(models.TestSet).filter(models.TestSet.id == test_set_id).first()
+    if not ts:
+        raise HTTPException(status_code=404, detail="Test set not found")
+    section = models.Section(test_set_id=test_set_id, **data.model_dump())
+    db.add(section)
+    db.commit()
+    db.refresh(section)
+    out = schemas.SectionOut.model_validate(section)
+    out.question_count = 0
+    return out
+
+
+@router.put("/test-sets/{test_set_id}/sections/{section_id}", response_model=schemas.SectionOut)
+def update_section(test_set_id: int, section_id: int, data: schemas.SectionUpdate, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    section = db.query(models.Section).filter(
+        models.Section.id == section_id,
+        models.Section.test_set_id == test_set_id,
+    ).first()
+    if not section:
+        raise HTTPException(status_code=404, detail="Section not found")
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(section, field, value)
+    db.commit()
+    db.refresh(section)
+    out = schemas.SectionOut.model_validate(section)
+    out.question_count = db.query(models.Question).filter(models.Question.section_id == section_id).count()
+    return out
+
+
+@router.delete("/test-sets/{test_set_id}/sections/{section_id}")
+def delete_section(test_set_id: int, section_id: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    section = db.query(models.Section).filter(
+        models.Section.id == section_id,
+        models.Section.test_set_id == test_set_id,
+    ).first()
+    if not section:
+        raise HTTPException(status_code=404, detail="Section not found")
+    # Unlink questions from this section (don't delete them)
+    db.query(models.Question).filter(models.Question.section_id == section_id).update({"section_id": None})
+    db.delete(section)
+    db.commit()
+    return {"message": "Section deleted, questions moved to unsectioned"}
 
 
 @router.post("/candidates", response_model=schemas.CandidateOut)

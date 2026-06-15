@@ -1,12 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, FileQuestion, Layers, Users,
+  LayoutDashboard, Layers, Users,
   Monitor, Mail, LogOut, ClipboardList
 } from 'lucide-react'
 
 const navItems = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/admin/questions', icon: FileQuestion, label: 'Questions' },
   { to: '/admin/test-sets', icon: Layers, label: 'Test Sets' },
   { to: '/admin/candidates', icon: Users, label: 'Candidates' },
   { to: '/admin/monitoring', icon: Monitor, label: 'Monitoring' },

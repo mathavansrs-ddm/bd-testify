@@ -6,6 +6,7 @@ import AdminLogin from './pages/AdminLogin'
 import AdminDashboard from './pages/AdminDashboard'
 import QuestionManager from './pages/QuestionManager'
 import TestSets from './pages/TestSets'
+import TestSetEditor from './pages/TestSetEditor'
 import CandidateList from './pages/CandidateList'
 import MonitoringDashboard from './pages/MonitoringDashboard'
 import InviteManager from './pages/InviteManager'
@@ -30,8 +31,9 @@ export default function App() {
         {/* Admin */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/dashboard" element={<PrivateRoute><AdminDashboard /></PrivateRoute>} />
-        <Route path="/admin/questions" element={<PrivateRoute><QuestionManager /></PrivateRoute>} />
+        <Route path="/admin/questions" element={<Navigate to="/admin/test-sets" replace />} />
         <Route path="/admin/test-sets" element={<PrivateRoute><TestSets /></PrivateRoute>} />
+        <Route path="/admin/test-sets/:id" element={<PrivateRoute><TestSetEditor /></PrivateRoute>} />
         <Route path="/admin/candidates" element={<PrivateRoute><CandidateList /></PrivateRoute>} />
         <Route path="/admin/monitoring" element={<PrivateRoute><MonitoringDashboard /></PrivateRoute>} />
         <Route path="/admin/invite" element={<PrivateRoute><InviteManager /></PrivateRoute>} />

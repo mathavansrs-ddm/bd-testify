@@ -7,7 +7,7 @@ import Timer from '../components/Timer'
 import ProgressBar from '../components/ProgressBar'
 import WebcamMonitor from '../components/Webcam'
 import AntiCheat from '../components/AntiCheat'
-import { AlertTriangle, CheckCircle, Camera, Shield, Eye, Clock, RefreshCw, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Camera, Shield, Eye, Clock, RefreshCw, X, Layers } from 'lucide-react'
 
 const STEPS = { SYSTEM_CHECK: 'system_check', TEST: 'test', FINISHED: 'finished', ERROR: 'error', SUSPENDED: 'suspended' }
 const MAX_WARNINGS = 5
@@ -18,6 +18,7 @@ export default function TestRoom() {
 
   const [step, setStep] = useState(STEPS.SYSTEM_CHECK)
   const [sessionData, setSessionData] = useState(null)
+  const [currentSection, setCurrentSection] = useState(0)  // index into sections array
   const [currentQ, setCurrentQ] = useState(0)
   const [answers, setAnswers] = useState({})
   const [warningCount, setWarningCount] = useState(0)
@@ -234,14 +235,26 @@ export default function TestRoom() {
     }
   }
 
+  // Returns the active question list (section-aware)
+  function activeQuestions() {
+    if (!sessionData) return []
+    const secs = sessionData.sections
+    if (secs && secs.length > 0) return secs[currentSection]?.questions || []
+    return sessionData.questions
+  }
+
   const handleAnswer = useCallback(async (option) => {
     if (!sessionData) return
-    const q = sessionData.questions[currentQ]
+    const qs = sessionData.sections?.length > 0
+      ? sessionData.sections[currentSection]?.questions || []
+      : sessionData.questions
+    const q = qs[currentQ]
+    if (!q) return
     setAnswers((prev) => ({ ...prev, [q.id]: option }))
     try {
       await saveAnswer({ session_id: sessionData.session_id, question_id: q.id, selected_option: option })
     } catch {}
-  }, [sessionData, currentQ])
+  }, [sessionData, currentQ, currentSection])
 
   async function handleSubmit() {
     if (step !== STEPS.TEST || submitting) return
@@ -433,10 +446,31 @@ export default function TestRoom() {
 
   // ── Main Test UI ──────────────────────────────────────────────
   if (step === STEPS.TEST && sessionData) {
-    const questions = sessionData.questions
+    const hasSections = sessionData.sections && sessionData.sections.length > 0
+    const sections = sessionData.sections || []
+    const questions = activeQuestions()
     const q = questions[currentQ]
-    const isLast = currentQ === questions.length - 1
+    const isLastQ = currentQ === questions.length - 1
+    const isLastSection = currentSection === sections.length - 1
+    const isLast = hasSections ? (isLastQ && isLastSection) : isLastQ
     const answeredCount = Object.keys(answers).length
+    const totalQuestions = hasSections
+      ? sections.reduce((sum, s) => sum + s.questions.length, 0)
+      : sessionData.questions.length
+
+    // When on sections mode, timer is per section; otherwise full test
+    const currentTimerMinutes = hasSections
+      ? (sections[currentSection]?.time_limit_minutes || sessionData.time_limit_minutes)
+      : sessionData.time_limit_minutes
+
+    function advanceSection() {
+      if (!isLastSection) {
+        setCurrentSection(s => s + 1)
+        setCurrentQ(0)
+      } else {
+        handleSubmit()
+      }
+    }
 
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col select-none">
@@ -511,6 +545,12 @@ export default function TestRoom() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {hasSections && (
+              <span className="hidden md:flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-slate-100 text-slate-600">
+                <Layers className="w-3 h-3" />
+                {sections[currentSection]?.name} ({currentSection + 1}/{sections.length})
+              </span>
+            )}
             <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
               warningCount === 0 ? 'bg-green-100 text-green-700'
               : warningCount <= 2 ? 'bg-yellow-100 text-yellow-700'
@@ -518,16 +558,26 @@ export default function TestRoom() {
               <AlertTriangle className="w-3 h-3" />
               {warningCount}/{MAX_WARNINGS}
             </div>
-            <Timer totalMinutes={sessionData.time_limit_minutes} onExpire={handleSubmit} />
+            <Timer key={`${currentSection}`} totalMinutes={currentTimerMinutes} onExpire={hasSections ? advanceSection : handleSubmit} />
           </div>
         </header>
+
+        {/* Section banner */}
+        {hasSections && (
+          <div className="bg-slate-800 text-white px-4 py-2 flex items-center justify-between text-sm">
+            <span className="font-semibold">{sections[currentSection]?.name}</span>
+            <span className="text-slate-400">{questions.length} questions · {currentTimerMinutes} min</span>
+          </div>
+        )}
 
         {/* ── DESKTOP 3-column layout (md+) ── */}
         <div className="hidden md:flex flex-1 overflow-hidden">
 
           {/* Left — navigator */}
           <div className="w-52 bg-white border-r border-slate-200 p-4 flex flex-col gap-3 overflow-y-auto">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Questions</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+              {hasSections ? sections[currentSection]?.name : 'Questions'}
+            </p>
             <div className="flex flex-wrap gap-1.5">
               {questions.map((question, i) => (
                 <button key={i} onClick={() => setCurrentQ(i)}
@@ -542,12 +592,19 @@ export default function TestRoom() {
             </div>
             <div className="space-y-1 text-xs text-slate-400">
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-500 inline-block" /> Answered ({answeredCount})</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-slate-100 border inline-block" /> Unanswered ({questions.length - answeredCount})</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-slate-100 border inline-block" /> Unanswered ({totalQuestions - answeredCount})</span>
             </div>
-            <button onClick={() => setShowConfirm(true)}
-              className="mt-auto w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">
-              Submit Test ✓
-            </button>
+            {hasSections && !isLastSection ? (
+              <button onClick={() => { setCurrentSection(s => s + 1); setCurrentQ(0) }}
+                className="mt-auto w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition">
+                Next Section →
+              </button>
+            ) : (
+              <button onClick={() => setShowConfirm(true)}
+                className="mt-auto w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">
+                Submit Test ✓
+              </button>
+            )}
           </div>
 
           {/* Center — question */}
@@ -555,27 +612,33 @@ export default function TestRoom() {
             <div className="max-w-2xl mx-auto space-y-4">
               <div className="flex items-center justify-between text-sm text-slate-500">
                 <span>Question {currentQ + 1} of {questions.length}</span>
-                <span className="text-green-600 font-medium">{answeredCount} answered</span>
+                <span className="text-green-600 font-medium">{answeredCount}/{totalQuestions} answered</span>
               </div>
               <ProgressBar current={currentQ + 1} total={questions.length} />
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <QuestionCard question={q} selectedOption={answers[q.id]} onSelect={handleAnswer} index={currentQ} />
               </div>
-              {answeredCount === questions.length && (
-                <button onClick={() => setShowConfirm(true)}
-                  className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold transition">
-                  ✓ All Answered — Submit Test
-                </button>
-              )}
               <div className="flex gap-3">
                 <button onClick={() => setCurrentQ(Math.max(0, currentQ - 1))} disabled={currentQ === 0}
                   className="flex-1 py-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium hover:bg-slate-50 disabled:opacity-40 transition">
                   ← Previous
                 </button>
-                <button onClick={() => setCurrentQ(Math.min(questions.length - 1, currentQ + 1))} disabled={isLast}
-                  className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition disabled:opacity-40">
-                  Next →
-                </button>
+                {isLastQ && hasSections && !isLastSection ? (
+                  <button onClick={() => { setCurrentSection(s => s + 1); setCurrentQ(0) }}
+                    className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition">
+                    Next Section →
+                  </button>
+                ) : isLastQ ? (
+                  <button onClick={() => setShowConfirm(true)}
+                    className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold transition">
+                    Submit ✓
+                  </button>
+                ) : (
+                  <button onClick={() => setCurrentQ(q => q + 1)}
+                    className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition">
+                    Next →
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -591,7 +654,7 @@ export default function TestRoom() {
             {/* AntiCheat rendered here for desktop — hidden on mobile via parent div but still active */}
             <div className="bg-slate-50 rounded-xl p-3 space-y-2 text-xs">
               <div className="flex justify-between"><span className="text-slate-500">Warnings</span><span className={`font-bold ${warningCount >= 3 ? 'text-red-600' : ''}`}>{warningCount}/{MAX_WARNINGS}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Answered</span><span className="font-bold">{answeredCount}/{questions.length}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Answered</span><span className="font-bold">{answeredCount}/{totalQuestions}</span></div>
             </div>
             <div>
               <p className="text-xs text-slate-400 mb-1">Violation level</p>
@@ -609,7 +672,7 @@ export default function TestRoom() {
           <div className="flex-1 overflow-y-auto px-3 pt-3 pb-24">
             <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
               <span>Q {currentQ + 1}/{questions.length}</span>
-              <span className="text-green-600 font-medium">{answeredCount} answered</span>
+              <span className="text-green-600 font-medium">{answeredCount}/{totalQuestions} answered</span>
             </div>
             <ProgressBar current={currentQ + 1} total={questions.length} />
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mt-3">
@@ -641,13 +704,18 @@ export default function TestRoom() {
                 className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold">
                 {currentQ + 1}/{questions.length}
               </button>
-              {isLast ? (
+              {isLastQ && hasSections && !isLastSection ? (
+                <button onClick={() => { setCurrentSection(s => s + 1); setCurrentQ(0) }}
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold">
+                  Next Section →
+                </button>
+              ) : isLastQ ? (
                 <button onClick={() => setShowConfirm(true)}
                   className="flex-1 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold">
                   Submit ✓
                 </button>
               ) : (
-                <button onClick={() => setCurrentQ(Math.min(questions.length - 1, currentQ + 1))}
+                <button onClick={() => setCurrentQ(q => q + 1)}
                   className="flex-1 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold">
                   Next →
                 </button>
