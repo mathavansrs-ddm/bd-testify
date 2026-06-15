@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Search, Download, Upload, UserPlus, RefreshCw, ChevronRight, X, ShieldOff, ShieldCheck, Users, GraduationCap, Briefcase } from 'lucide-react'
+import { Search, Download, Upload, UserPlus, RefreshCw, ChevronRight, X, ShieldOff, ShieldCheck, Users, GraduationCap, Briefcase, Copy, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
 import { getCandidates, getCandidate, addCandidate, bulkUploadCandidates, downloadCandidateTemplate, allowReattempt, exportCandidates, unblockCandidate, getFraudLog } from '../services/api'
@@ -22,6 +22,8 @@ export default function CandidateList() {
   const [addForm, setAddForm] = useState(BLANK_EXTERNAL)
   const [addLoading, setAddLoading] = useState(false)
   const [uploadResult, setUploadResult] = useState(null)
+  const [reattemptLink, setReattemptLink] = useState(null)
+  const [linkCopied, setLinkCopied] = useState(false)
   const fileRef = useRef()
 
   useEffect(() => { load() }, [search, filterType, filterBlocked])
@@ -83,8 +85,23 @@ export default function CandidateList() {
   }
 
   async function handleReattempt(id) {
-    try { await allowReattempt(id); toast.success('Reattempt allowed'); load(); if (detail) { const r = await getCandidate(id); setDetail(r.data) } }
-    catch { toast.error('Failed') }
+    try {
+      const r = await allowReattempt(id)
+      load()
+      if (detail) { const r2 = await getCandidate(id); setDetail(r2.data) }
+      if (r.data.test_link) {
+        setReattemptLink(r.data.test_link)
+        setLinkCopied(false)
+      } else {
+        toast.success('Reattempt allowed')
+      }
+    } catch { toast.error('Failed') }
+  }
+
+  function copyReattemptLink() {
+    navigator.clipboard.writeText(reattemptLink)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
   }
 
   async function handleUnblock(id) {
@@ -377,6 +394,34 @@ export default function CandidateList() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Reattempt link modal */}
+      {reattemptLink && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-900 text-lg">Reattempt Link Ready</h3>
+              <button onClick={() => setReattemptLink(null)}><X className="w-5 h-5 text-gray-400" /></button>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              The candidate has been unblocked. Share this link with them — it expires in 48 hours.
+              An email was also attempted automatically.
+            </p>
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+              <p className="flex-1 text-sm text-slate-700 break-all">{reattemptLink}</p>
+              <button onClick={copyReattemptLink}
+                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                  linkCopied ? 'bg-green-100 text-green-700' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
+                {linkCopied ? <><Check className="w-4 h-4" /> Copied!</> : <><Copy className="w-4 h-4" /> Copy</>}
+              </button>
+            </div>
+            <button onClick={() => setReattemptLink(null)}
+              className="mt-4 w-full py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50">
+              Close
+            </button>
           </div>
         </div>
       )}
