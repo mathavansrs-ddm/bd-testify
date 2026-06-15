@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { RefreshCw, AlertTriangle, Eye, X, CheckCircle, StopCircle, ShieldOff, Activity, Clock, Camera } from 'lucide-react'
 import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
@@ -22,6 +22,7 @@ export default function MonitoringDashboard() {
   const [selected, setSelected] = useState(null)
   const [detail, setDetail] = useState(null)
   const [fraudLog, setFraudLog] = useState([])
+  const liveTimerRef = useRef(null)
 
   useEffect(() => {
     load()
@@ -30,6 +31,21 @@ export default function MonitoringDashboard() {
     }, 10000)
     return () => clearInterval(id)
   }, [tab])
+
+  // Auto-refresh selected session snapshot every 5s while drawer is open on a live session
+  useEffect(() => {
+    clearInterval(liveTimerRef.current)
+    if (selected?.status === 'started') {
+      liveTimerRef.current = setInterval(async () => {
+        try {
+          const r = await getActiveSessions(null)
+          const fresh = r.data.find(s => s.session_id === selected.session_id)
+          if (fresh) setSelected(fresh)
+        } catch {}
+      }, 5000)
+    }
+    return () => clearInterval(liveTimerRef.current)
+  }, [selected?.session_id, selected?.status])
 
   async function load() {
     try {
@@ -289,14 +305,19 @@ export default function MonitoringDashboard() {
                     <span className="text-xs text-gray-400">{new Date(selected.snapshot_at).toLocaleTimeString()}</span>
                   )}
                 </div>
-                <div className="bg-slate-900 rounded-2xl overflow-hidden aspect-video flex items-center justify-center">
+                <div className="bg-slate-900 rounded-2xl overflow-hidden aspect-video flex items-center justify-center relative">
                   {selected.latest_snapshot
                     ? <img src={selected.latest_snapshot} alt="snapshot" className="w-full h-full object-cover" />
                     : <div className="text-center text-white/40">
                         <Camera className="w-8 h-8 mx-auto mb-1 opacity-40" />
-                        <p className="text-xs">{selected.status === 'started' ? 'Waiting for snapshot…' : 'No snapshot saved'}</p>
+                        <p className="text-xs">{selected.status === 'started' ? 'Waiting for first frame…' : 'No snapshot saved'}</p>
                       </div>
                   }
+                  {selected.status === 'started' && (
+                    <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                      <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" /> LIVE · 5s
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

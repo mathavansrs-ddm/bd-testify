@@ -181,9 +181,9 @@ export default function TestRoom() {
       if (photoDataUrl) {
         uploadPhoto({ session_id: sid, image: photoDataUrl }).catch(() => {})
       }
-      // Start periodic snapshot every 30s
+      // Start periodic snapshot every 5s for near-live monitoring
       sendSnapshot(sid)
-      snapshotTimer.current = setInterval(() => sendSnapshot(sid), 30000)
+      snapshotTimer.current = setInterval(() => sendSnapshot(sid), 5000)
       setStep(STEPS.TEST)
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to start test. Please check your invite link.')
