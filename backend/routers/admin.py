@@ -382,10 +382,14 @@ def get_candidate(id: int, db: Session = Depends(get_db), admin=Depends(get_curr
     candidate = db.query(models.Candidate).filter(models.Candidate.id == id).first()
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    sessions = db.query(models.TestSession).filter(models.TestSession.candidate_id == id).all()
+    try:
+        sessions = db.query(models.TestSession).filter(models.TestSession.candidate_id == id).all()
+        sessions_out = [schemas.SessionOut.model_validate(s) for s in sessions]
+    except Exception:
+        sessions_out = []
     return {
         "candidate": schemas.CandidateOut.model_validate(candidate),
-        "sessions": [schemas.SessionOut.model_validate(s) for s in sessions]
+        "sessions": sessions_out
     }
 
 

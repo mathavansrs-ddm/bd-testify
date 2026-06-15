@@ -223,6 +223,9 @@ class InviteOut(BaseModel):
     expires_at: datetime
     is_used: bool
     used_at: Optional[datetime] = None
+    test_link: Optional[str] = None
+    email_sent: Optional[bool] = None
+    email_error: Optional[str] = None
 
     class Config:
         from_attributes = True
