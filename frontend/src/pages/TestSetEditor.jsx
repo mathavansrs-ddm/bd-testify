@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Edit, Trash2, X, Upload, Download, Save, Clock, BookOpen, Layers } from 'lucide-react'
 import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
+import { useAdminRole } from '../hooks/useAdminRole'
 import {
   getTestSet, updateTestSet,
   getSections, createSection, updateSection, deleteSection,
@@ -18,6 +19,7 @@ export default function TestSetEditor() {
   const { id } = useParams()
   const navigate = useNavigate()
   const testSetId = Number(id)
+  const { isSuperAdmin } = useAdminRole()
 
   const [tab, setTab] = useState('Settings')
   const [testSet, setTestSet] = useState(null)
@@ -358,10 +360,12 @@ export default function TestSetEditor() {
                         className="p-2 text-gray-400 hover:text-navy-900 rounded-lg hover:bg-gray-100">
                         <Edit className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDeleteSection(s)}
-                        className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {isSuperAdmin && (
+                        <button onClick={() => handleDeleteSection(s)}
+                          className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -440,10 +444,12 @@ export default function TestSetEditor() {
                           className="p-2 text-gray-400 hover:text-navy-900 rounded-lg hover:bg-gray-100">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDeleteQ(q.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {isSuperAdmin && (
+                          <button onClick={() => handleDeleteQ(q.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

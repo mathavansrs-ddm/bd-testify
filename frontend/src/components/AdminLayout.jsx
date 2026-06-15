@@ -1,10 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Layers, Users,
-  Monitor, Mail, LogOut, ClipboardList
+  Monitor, Mail, LogOut, ClipboardList, ShieldCheck
 } from 'lucide-react'
+import { useAdminRole } from '../hooks/useAdminRole'
 
-const navItems = [
+const baseNavItems = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/admin/test-sets', icon: Layers, label: 'Test Sets' },
   { to: '/admin/candidates', icon: Users, label: 'Candidates' },
@@ -12,11 +13,19 @@ const navItems = [
   { to: '/admin/invite', icon: Mail, label: 'Invite' },
 ]
 
+const superAdminItems = [
+  { to: '/admin/masters', icon: ShieldCheck, label: 'Masters' },
+]
+
 export default function AdminLayout({ children, title }) {
   const navigate = useNavigate()
+  const { isSuperAdmin, name, role } = useAdminRole()
+  const navItems = isSuperAdmin ? [...baseNavItems, ...superAdminItems] : baseNavItems
 
   function logout() {
     localStorage.removeItem('admin_token')
+    localStorage.removeItem('admin_role')
+    localStorage.removeItem('admin_name')
     navigate('/admin/login')
   }
 
@@ -51,7 +60,15 @@ export default function AdminLayout({ children, title }) {
             </NavLink>
           ))}
         </nav>
-        <div className="p-3 border-t border-navy-800">
+        <div className="p-3 border-t border-navy-800 space-y-1">
+          <div className="px-3 py-2">
+            <p className="text-white text-sm font-medium truncate">{name}</p>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              isSuperAdmin ? 'bg-yellow-500 text-yellow-900' : 'bg-navy-700 text-navy-200'
+            }`}>
+              {isSuperAdmin ? 'Super Admin' : 'Master'}
+            </span>
+          </div>
           <button
             onClick={logout}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-navy-200 hover:bg-navy-800 hover:text-white transition-colors"

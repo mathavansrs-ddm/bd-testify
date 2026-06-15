@@ -27,6 +27,10 @@ def run_migrations():
         ("test_sessions", "snapshot_at", "TIMESTAMP"),
         ("questions", "section_id", "INTEGER REFERENCES sections(id) ON DELETE SET NULL"),
         ("sections", "order", "INTEGER DEFAULT 0"),
+        ("admins", "name", "VARCHAR"),
+        ("admins", "role", "VARCHAR DEFAULT 'superadmin'"),
+        ("admins", "is_active", "BOOLEAN DEFAULT TRUE"),
+        ("admins", "created_by", "INTEGER REFERENCES admins(id) ON DELETE SET NULL"),
     ]
     with engine.connect() as conn:
         for table, col, col_type in migrations:

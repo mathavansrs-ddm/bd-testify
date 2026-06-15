@@ -49,6 +49,45 @@ class AdminLogin(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    role: str = "superadmin"
+    name: Optional[str] = None
+
+
+# ── Masters ────────────────────────────────────────────────────────────────
+class MasterCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
+class MasterUpdate(BaseModel):
+    name: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class MasterOut(BaseModel):
+    id: int
+    name: Optional[str] = None
+    email: str
+    role: str
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ActivityLogOut(BaseModel):
+    id: int
+    admin_id: int
+    action: str
+    detail: Optional[str] = None
+    created_at: datetime
+    admin_name: Optional[str] = None
+    admin_email: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 class ChangePassword(BaseModel):

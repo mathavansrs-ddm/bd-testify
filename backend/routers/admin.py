@@ -2,22 +2,32 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFi
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, cast, Date
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import List, Optional
 import io
 import csv
+import uuid
+import os
 import pandas as pd
 
 from database import get_db
 import models
 import schemas
-from auth import get_current_admin, verify_password, get_password_hash, create_access_token
+from auth import get_current_admin, require_superadmin, verify_password, get_password_hash, create_access_token
 from routers.invite import _create_invite
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 # In-memory rate limiting store
 login_attempts: dict = {}
+
+
+def _log(db: Session, admin_id: int, action: str, detail: str = None):
+    try:
+        db.add(models.AdminActivityLog(admin_id=admin_id, action=action, detail=detail))
+        db.commit()
+    except Exception:
+        db.rollback()
 
 
 @router.post("/login", response_model=schemas.TokenResponse)
@@ -35,10 +45,13 @@ def admin_login(data: schemas.AdminLogin, request: Request, db: Session = Depend
         attempts.append(now)
         login_attempts[client_ip] = attempts
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not admin.is_active:
+        raise HTTPException(status_code=403, detail="Account is deactivated")
 
     login_attempts[client_ip] = []
     token = create_access_token({"sub": admin.email})
-    return {"access_token": token, "token_type": "bearer"}
+    _log(db, admin.id, "login", f"Logged in from {client_ip}")
+    return {"access_token": token, "token_type": "bearer", "role": admin.role, "name": admin.name or admin.email}
 
 
 @router.get("/dashboard/stats", response_model=schemas.DashboardStats)
@@ -73,6 +86,7 @@ def create_question(data: schemas.QuestionCreate, db: Session = Depends(get_db),
     db.add(q)
     db.commit()
     db.refresh(q)
+    _log(db, admin.id, "question_created", f"Added question to '{test_set.set_name}'")
     return q
 
 
@@ -99,7 +113,7 @@ def update_question(id: int, data: schemas.QuestionUpdate, db: Session = Depends
 
 
 @router.delete("/questions/{id}")
-def delete_question(id: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+def delete_question(id: int, db: Session = Depends(get_db), admin=Depends(require_superadmin)):
     q = db.query(models.Question).filter(models.Question.id == id).first()
     if not q:
         raise HTTPException(status_code=404, detail="Question not found")
@@ -227,6 +241,7 @@ def create_test_set(data: schemas.TestSetCreate, db: Session = Depends(get_db), 
     db.add(ts)
     db.commit()
     db.refresh(ts)
+    _log(db, admin.id, "test_set_created", f"Created test set: '{data.set_name}'")
     result = schemas.TestSetOut.model_validate(ts)
     result.question_count = db.query(models.Question).filter(models.Question.test_set_id == ts.id).count()
     return result
@@ -320,7 +335,7 @@ def update_section(test_set_id: int, section_id: int, data: schemas.SectionUpdat
 
 
 @router.delete("/test-sets/{test_set_id}/sections/{section_id}")
-def delete_section(test_set_id: int, section_id: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+def delete_section(test_set_id: int, section_id: int, db: Session = Depends(get_db), admin=Depends(require_superadmin)):
     section = db.query(models.Section).filter(
         models.Section.id == section_id,
         models.Section.test_set_id == test_set_id,
@@ -590,7 +605,7 @@ def get_session(id: int, db: Session = Depends(get_db), admin=Depends(get_curren
 
 
 @router.delete("/sessions/{id}")
-def delete_session(id: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+def delete_session(id: int, db: Session = Depends(get_db), admin=Depends(require_superadmin)):
     session = db.query(models.TestSession).filter(models.TestSession.id == id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -698,6 +713,143 @@ def get_settings(admin=Depends(get_current_admin)):
     """Global settings are now managed per test-set. This endpoint returns info."""
     return {"message": "Settings are configured per test set. Edit each test set individually."}
 
+
+# ── Masters management (superadmin only) ────────────────────────────────
+
+@router.get("/masters", response_model=List[schemas.MasterOut])
+def list_masters(db: Session = Depends(get_db), admin=Depends(require_superadmin)):
+    return db.query(models.Admin).filter(models.Admin.role == models.AdminRole.master).all()
+
+
+@router.post("/masters", response_model=schemas.MasterOut)
+def create_master(data: schemas.MasterCreate, db: Session = Depends(get_db), admin=Depends(require_superadmin)):
+    from services.email_service import send_master_welcome_email
+    if db.query(models.Admin).filter(models.Admin.email == data.email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    if len(data.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    master = models.Admin(
+        email=data.email,
+        name=data.name,
+        hashed_password=get_password_hash(data.password),
+        role=models.AdminRole.master,
+        is_active=True,
+        created_by=admin.id,
+    )
+    db.add(master)
+    db.commit()
+    db.refresh(master)
+    _log(db, admin.id, "master_created", f"Created master account: {data.email}")
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    try:
+        send_master_welcome_email(data.email, data.name, data.password, f"{frontend_url}/admin/login")
+    except Exception:
+        pass
+    return master
+
+
+@router.put("/masters/{master_id}", response_model=schemas.MasterOut)
+def update_master(master_id: int, data: schemas.MasterUpdate, db: Session = Depends(get_db), admin=Depends(require_superadmin)):
+    master = db.query(models.Admin).filter(models.Admin.id == master_id, models.Admin.role == models.AdminRole.master).first()
+    if not master:
+        raise HTTPException(status_code=404, detail="Master not found")
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(master, field, value)
+    db.commit()
+    db.refresh(master)
+    _log(db, admin.id, "master_updated", f"Updated master: {master.email}")
+    return master
+
+
+@router.delete("/masters/{master_id}")
+def delete_master(master_id: int, db: Session = Depends(get_db), admin=Depends(require_superadmin)):
+    master = db.query(models.Admin).filter(models.Admin.id == master_id, models.Admin.role == models.AdminRole.master).first()
+    if not master:
+        raise HTTPException(status_code=404, detail="Master not found")
+    _log(db, admin.id, "master_deleted", f"Deleted master: {master.email}")
+    db.delete(master)
+    db.commit()
+    return {"message": "Master deleted"}
+
+
+@router.post("/masters/{master_id}/reset-password")
+def reset_master_password(master_id: int, db: Session = Depends(get_db), admin=Depends(require_superadmin)):
+    from services.email_service import send_password_reset_email
+    master = db.query(models.Admin).filter(models.Admin.id == master_id, models.Admin.role == models.AdminRole.master).first()
+    if not master:
+        raise HTTPException(status_code=404, detail="Master not found")
+    # Invalidate old tokens
+    db.query(models.PasswordResetToken).filter(models.PasswordResetToken.admin_id == master_id).delete()
+    token = str(uuid.uuid4())
+    reset_token = models.PasswordResetToken(
+        admin_id=master_id,
+        token=token,
+        expires_at=datetime.utcnow() + timedelta(hours=24),
+    )
+    db.add(reset_token)
+    db.commit()
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    reset_link = f"{frontend_url}/admin/reset-password?token={token}"
+    try:
+        send_password_reset_email(master.email, master.name or master.email, reset_link)
+        _log(db, admin.id, "password_reset_sent", f"Password reset sent to: {master.email}")
+        return {"message": f"Password reset email sent to {master.email}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+
+@router.post("/reset-password")
+def confirm_reset_password(token: str, new_password: str, db: Session = Depends(get_db)):
+    reset_token = db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.token == token,
+        models.PasswordResetToken.used == False,
+    ).first()
+    if not reset_token:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+    if reset_token.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Reset link has expired")
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    admin = db.query(models.Admin).filter(models.Admin.id == reset_token.admin_id).first()
+    if not admin:
+        raise HTTPException(status_code=404, detail="Account not found")
+    admin.hashed_password = get_password_hash(new_password)
+    reset_token.used = True
+    db.commit()
+    return {"message": "Password updated successfully. You can now log in."}
+
+
+@router.get("/masters/{master_id}/activity", response_model=List[schemas.ActivityLogOut])
+def get_master_activity(master_id: int, db: Session = Depends(get_db), admin=Depends(require_superadmin)):
+    logs = db.query(models.AdminActivityLog).filter(
+        models.AdminActivityLog.admin_id == master_id
+    ).order_by(models.AdminActivityLog.created_at.desc()).limit(200).all()
+    master = db.query(models.Admin).filter(models.Admin.id == master_id).first()
+    result = []
+    for log in logs:
+        out = schemas.ActivityLogOut.model_validate(log)
+        out.admin_name = master.name if master else None
+        out.admin_email = master.email if master else None
+        result.append(out)
+    return result
+
+
+@router.get("/activity-log", response_model=List[schemas.ActivityLogOut])
+def get_all_activity(db: Session = Depends(get_db), admin=Depends(require_superadmin)):
+    logs = db.query(models.AdminActivityLog).order_by(
+        models.AdminActivityLog.created_at.desc()
+    ).limit(500).all()
+    result = []
+    for log in logs:
+        a = db.query(models.Admin).filter(models.Admin.id == log.admin_id).first()
+        out = schemas.ActivityLogOut.model_validate(log)
+        out.admin_name = a.name if a else None
+        out.admin_email = a.email if a else None
+        result.append(out)
+    return result
+
+
+# ── Password change (self) ───────────────────────────────────────────────
 
 @router.put("/change-password")
 def change_password(data: schemas.ChangePassword, db: Session = Depends(get_db), admin=Depends(get_current_admin)):

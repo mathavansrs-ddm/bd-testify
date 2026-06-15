@@ -49,12 +49,46 @@ class AutoAction(str, enum.Enum):
     block = "block"
 
 
+class AdminRole(str, enum.Enum):
+    superadmin = "superadmin"
+    master = "master"
+
+
 class Admin(Base):
     __tablename__ = "admins"
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=True)
     hashed_password = Column(String, nullable=False)
+    role = Column(Enum(AdminRole), default=AdminRole.superadmin, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_by = Column(Integer, ForeignKey("admins.id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    activity_logs = relationship("AdminActivityLog", back_populates="admin", foreign_keys="AdminActivityLog.admin_id")
+
+
+class AdminActivityLog(Base):
+    __tablename__ = "admin_activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, ForeignKey("admins.id"), nullable=False)
+    action = Column(String, nullable=False)
+    detail = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    admin = relationship("Admin", back_populates="activity_logs", foreign_keys=[admin_id])
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, ForeignKey("admins.id"), nullable=False)
+    token = Column(String, unique=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
 
 

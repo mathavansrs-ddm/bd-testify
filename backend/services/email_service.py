@@ -97,6 +97,95 @@ def send_invite_email(to_email: str, candidate_name: str, test_link: str, expire
     _send_email(to_email, subject, html_body)
 
 
+def send_password_reset_email(to_email: str, name: str, reset_link: str):
+    subject = "BD Testify — Password Reset"
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body {{ font-family: Arial, sans-serif; background: #f4f6f8; margin: 0; padding: 0; }}
+        .container {{ max-width: 600px; margin: 30px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
+        .header {{ background: #1e3a5f; color: #fff; padding: 30px; text-align: center; }}
+        .body {{ padding: 30px; color: #333; }}
+        .btn {{ display: inline-block; margin: 20px 0; padding: 14px 28px; background: #1e3a5f; color: #fff; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: bold; }}
+        .warning {{ background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 16px 0; border-radius: 4px; }}
+        .footer {{ background: #f4f6f8; padding: 20px; text-align: center; font-size: 12px; color: #888; }}
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>BD Testify — Building Doctor</h1>
+          <p>Admin Panel Password Reset</p>
+        </div>
+        <div class="body">
+          <p>Hi <strong>{name}</strong>,</p>
+          <p>Your password has been reset by the Super Admin. Click the button below to set a new password.</p>
+          <div class="warning">
+            <strong>⏳ This link expires in 24 hours.</strong> If you did not expect this, contact your administrator.
+          </div>
+          <center>
+            <a href="{reset_link}" class="btn">Set New Password →</a>
+          </center>
+          <p>Or paste this link in your browser:</p>
+          <p style="word-break: break-all; color: #1e3a5f;">{reset_link}</p>
+        </div>
+        <div class="footer">
+          <p>© 2025 Building Doctor. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+    """
+    _send_email(to_email, subject, html_body)
+
+
+def send_master_welcome_email(to_email: str, name: str, temp_password: str, login_url: str):
+    subject = "BD Testify — Your Master Account"
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body {{ font-family: Arial, sans-serif; background: #f4f6f8; margin: 0; padding: 0; }}
+        .container {{ max-width: 600px; margin: 30px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
+        .header {{ background: #1e3a5f; color: #fff; padding: 30px; text-align: center; }}
+        .body {{ padding: 30px; color: #333; }}
+        .creds {{ background: #f0f4f8; border-radius: 8px; padding: 20px; margin: 16px 0; font-family: monospace; }}
+        .btn {{ display: inline-block; margin: 20px 0; padding: 14px 28px; background: #1e3a5f; color: #fff; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: bold; }}
+        .footer {{ background: #f4f6f8; padding: 20px; text-align: center; font-size: 12px; color: #888; }}
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>BD Testify — Building Doctor</h1>
+          <p>Welcome to the Admin Panel</p>
+        </div>
+        <div class="body">
+          <p>Hi <strong>{name}</strong>,</p>
+          <p>A Master account has been created for you on the BD Testify admin panel. Your login credentials are below.</p>
+          <div class="creds">
+            <p><strong>Login URL:</strong> <a href="{login_url}">{login_url}</a></p>
+            <p><strong>Email:</strong> {to_email}</p>
+            <p><strong>Temporary Password:</strong> {temp_password}</p>
+          </div>
+          <p>Please log in and change your password immediately.</p>
+          <center>
+            <a href="{login_url}" class="btn">Go to Admin Panel →</a>
+          </center>
+        </div>
+        <div class="footer">
+          <p>© 2025 Building Doctor. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+    """
+    _send_email(to_email, subject, html_body)
+
+
 def send_result_email(to_email: str, candidate_name: str, score: int, total: int, percentage: float, test_set_name: str):
     subject = "Your Assessment Result — Building Doctor"
     pass_fail = "PASS" if percentage >= 60 else "FAIL"

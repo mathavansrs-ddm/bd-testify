@@ -52,4 +52,12 @@ def get_current_admin(token: str = Depends(oauth2_scheme), db: Session = Depends
     admin = db.query(models.Admin).filter(models.Admin.email == email).first()
     if admin is None:
         raise credentials_exception
+    if not admin.is_active:
+        raise HTTPException(status_code=403, detail="Account is deactivated")
+    return admin
+
+
+def require_superadmin(admin=Depends(get_current_admin)):
+    if admin.role != models.AdminRole.superadmin:
+        raise HTTPException(status_code=403, detail="Superadmin access required")
     return admin

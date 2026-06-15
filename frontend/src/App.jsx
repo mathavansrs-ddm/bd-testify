@@ -7,6 +7,8 @@ import AdminDashboard from './pages/AdminDashboard'
 import QuestionManager from './pages/QuestionManager'
 import TestSets from './pages/TestSets'
 import TestSetEditor from './pages/TestSetEditor'
+import Masters from './pages/Masters'
+import ResetPassword from './pages/ResetPassword'
 import CandidateList from './pages/CandidateList'
 import MonitoringDashboard from './pages/MonitoringDashboard'
 import InviteManager from './pages/InviteManager'
@@ -37,6 +39,8 @@ export default function App() {
         <Route path="/admin/candidates" element={<PrivateRoute><CandidateList /></PrivateRoute>} />
         <Route path="/admin/monitoring" element={<PrivateRoute><MonitoringDashboard /></PrivateRoute>} />
         <Route path="/admin/invite" element={<PrivateRoute><InviteManager /></PrivateRoute>} />
+        <Route path="/admin/masters" element={<PrivateRoute><Masters /></PrivateRoute>} />
+        <Route path="/admin/reset-password" element={<ResetPassword />} />
 
         {/* Candidate — external (invite link) */}
         <Route path="/register" element={<CandidateRegister />} />

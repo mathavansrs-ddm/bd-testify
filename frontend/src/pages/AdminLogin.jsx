@@ -16,6 +16,8 @@ export default function AdminLogin() {
     try {
       const res = await adminLogin({ email, password })
       localStorage.setItem('admin_token', res.data.access_token)
+      localStorage.setItem('admin_role', res.data.role || 'superadmin')
+      localStorage.setItem('admin_name', res.data.name || email)
       toast.success('Welcome back!')
       navigate('/admin/dashboard')
     } catch (err) {

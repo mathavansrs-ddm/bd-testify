@@ -29,6 +29,16 @@ api.interceptors.response.use(
 // Admin
 export const adminLogin = (data) => api.post('/admin/login', data)
 export const changePassword = (data) => api.put('/admin/change-password', data)
+export const confirmResetPassword = (token, new_password) => api.post('/admin/reset-password', null, { params: { token, new_password } })
+
+// Masters (superadmin only)
+export const getMasters = () => api.get('/admin/masters')
+export const createMaster = (data) => api.post('/admin/masters', data)
+export const updateMaster = (id, data) => api.put(`/admin/masters/${id}`, data)
+export const deleteMaster = (id) => api.delete(`/admin/masters/${id}`)
+export const resetMasterPassword = (id) => api.post(`/admin/masters/${id}/reset-password`)
+export const getMasterActivity = (id) => api.get(`/admin/masters/${id}/activity`)
+export const getAllActivity = () => api.get('/admin/activity-log')
 export const getDashboardStats = () => api.get('/admin/dashboard/stats')
 export const getAdminSessions = (status) => api.get('/admin/sessions', { params: { status } })
 export const getAdminSession = (id) => api.get(`/admin/sessions/${id}`)

@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
 import { getActiveSessions, getAdminSession, markSessionReviewed, suspendTest, getFraudLog, deleteSession } from '../services/api'
 import { formatIST, formatISTTime } from '../utils/dateFormat'
+import { useAdminRole } from '../hooks/useAdminRole'
 
 const EVENT_LABELS = {
   face_not_detected: 'No face detected',
@@ -17,6 +18,7 @@ const EVENT_LABELS = {
 const MAX_WARNINGS = 5
 
 export default function MonitoringDashboard() {
+  const { isSuperAdmin } = useAdminRole()
   const [tab, setTab] = useState('ongoing')
   const [cameraRefresh, setCameraRefresh] = useState(0)
   const [sessions, setSessions] = useState([])
@@ -214,13 +216,15 @@ export default function MonitoringDashboard() {
                   : s.status === 'submitted' ? 'border-l-green-400'
                   : 'border-l-blue-400'}`}
               onClick={() => openDetail(s)}>
-              {/* Delete button */}
-              <button
-                onClick={(e) => handleDelete(s.session_id, e)}
-                className="absolute top-2 right-2 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition z-10"
-                title="Delete session">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              {/* Delete button — superadmin only */}
+              {isSuperAdmin && (
+                <button
+                  onClick={(e) => handleDelete(s.session_id, e)}
+                  className="absolute top-2 right-2 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition z-10"
+                  title="Delete session">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
 
               <div className="flex justify-between items-start mb-3 pr-6">
                 <div className="flex items-center gap-3">
@@ -428,10 +432,10 @@ export default function MonitoringDashboard() {
                     </button>
                   </div>
                 )}
-                <button onClick={(e) => handleDelete(selected.session_id, e)}
+                {isSuperAdmin && <button onClick={(e) => handleDelete(selected.session_id, e)}
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-red-200 text-red-500 text-sm font-medium hover:bg-red-50 transition mt-2">
                   <Trash2 className="w-4 h-4" /> Delete Session Record
-                </button>
+                </button>}
               </div>
             )}
           </div>
