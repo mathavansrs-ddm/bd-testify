@@ -45,7 +45,7 @@ def admin_login(data: schemas.AdminLogin, request: Request, db: Session = Depend
         attempts.append(now)
         login_attempts[client_ip] = attempts
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    if not admin.is_active:
+    if admin.is_active is False:
         raise HTTPException(status_code=403, detail="Account is deactivated")
 
     login_attempts[client_ip] = []

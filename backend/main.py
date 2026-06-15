@@ -26,7 +26,7 @@ def run_migrations():
         ("test_sessions", "latest_snapshot", "TEXT"),
         ("test_sessions", "snapshot_at", "TIMESTAMP"),
         ("questions", "section_id", "INTEGER REFERENCES sections(id) ON DELETE SET NULL"),
-        ("sections", "order", "INTEGER DEFAULT 0"),
+        ("sections", '"order"', "INTEGER DEFAULT 0"),
         ("admins", "name", "VARCHAR"),
         ("admins", "role", "VARCHAR DEFAULT 'superadmin'"),
         ("admins", "is_active", "BOOLEAN DEFAULT TRUE"),
@@ -39,6 +39,7 @@ def run_migrations():
                 conn.commit()
                 print(f"[MIGRATION] {table}.{col} ready")
             except Exception as e:
+                conn.rollback()
                 print(f"[MIGRATION] {table}.{col} skipped: {e}")
 
 

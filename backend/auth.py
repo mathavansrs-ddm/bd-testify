@@ -58,6 +58,7 @@ def get_current_admin(token: str = Depends(oauth2_scheme), db: Session = Depends
 
 
 def require_superadmin(admin=Depends(get_current_admin)):
-    if admin.role != models.AdminRole.superadmin:
+    # treat None role as superadmin for backward compat with existing accounts before migration
+    if admin.role is not None and admin.role != models.AdminRole.superadmin:
         raise HTTPException(status_code=403, detail="Superadmin access required")
     return admin
