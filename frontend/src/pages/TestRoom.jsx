@@ -232,20 +232,22 @@ export default function TestRoom() {
           <div className="p-8">
             {/* Camera preview / captured photo */}
             <div className="rounded-2xl overflow-hidden bg-slate-900 aspect-video flex items-center justify-center mb-4 shadow-inner relative">
-              {photoCaptured && photoDataUrl ? (
+              {/* Always keep video in DOM so stream stays attached */}
+              {!cameraOk && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white/40">
+                  <Camera className="w-12 h-12 mb-3 opacity-40" />
+                  <p className="text-sm">Your camera preview will appear here</p>
+                </div>
+              )}
+              <video ref={videoRef} autoPlay muted playsInline
+                className={`w-full h-full object-cover ${photoCaptured ? 'hidden' : ''}`} />
+              {photoCaptured && photoDataUrl && (
                 <>
                   <img src={photoDataUrl} alt="Captured" className="w-full h-full object-cover" />
                   <div className="absolute bottom-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
                     <CheckCircle className="w-3 h-3" /> Photo captured
                   </div>
                 </>
-              ) : cameraOk ? (
-                <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
-              ) : (
-                <div className="text-center text-white/40 p-6">
-                  <Camera className="w-12 h-12 mx-auto mb-3 opacity-40" />
-                  <p className="text-sm">Your camera preview will appear here</p>
-                </div>
               )}
             </div>
             <canvas ref={canvasRef} className="hidden" />
@@ -424,17 +426,43 @@ export default function TestRoom() {
         </header>
 
         <div className="flex flex-1 overflow-hidden">
-          {/* Main question area */}
+
+          {/* LEFT sidebar — question navigator */}
+          <div className="w-52 bg-white border-r border-slate-200 p-4 flex flex-col gap-3 shadow-sm overflow-y-auto">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Questions</p>
+            <div className="flex flex-wrap gap-1.5">
+              {questions.map((question, i) => (
+                <button key={i} onClick={() => setCurrentQ(i)}
+                  className={`w-9 h-9 rounded-lg text-sm font-semibold transition ${
+                    i === currentQ ? 'bg-slate-900 text-white shadow'
+                    : answers[question.id] ? 'bg-green-500 text-white'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  }`}>
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-1.5 text-xs text-slate-400 mt-1">
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-500 inline-block" /> Answered ({answeredCount})</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-slate-900 inline-block" /> Current</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-slate-100 border inline-block" /> Unanswered ({questions.length - answeredCount})</span>
+            </div>
+            {/* Submit shortcut */}
+            <button onClick={() => setShowConfirm(true)}
+              className="mt-auto w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition">
+              Submit Test ✓
+            </button>
+          </div>
+
+          {/* CENTER — question content */}
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-2xl mx-auto space-y-5">
-              {/* Progress */}
-              <div className="flex items-center justify-between text-sm text-slate-500 mb-1">
+              <div className="flex items-center justify-between text-sm text-slate-500">
                 <span>Question {currentQ + 1} of {questions.length}</span>
                 <span className="text-green-600 font-medium">{answeredCount} answered</span>
               </div>
               <ProgressBar current={currentQ + 1} total={questions.length} />
 
-              {/* Question card */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <QuestionCard
                   question={q}
@@ -444,53 +472,23 @@ export default function TestRoom() {
                 />
               </div>
 
-              {/* Navigation */}
               <div className="flex justify-between gap-3">
                 <button onClick={() => setCurrentQ(Math.max(0, currentQ - 1))}
                   disabled={currentQ === 0}
                   className="flex-1 py-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium hover:bg-slate-50 disabled:opacity-40 transition">
                   ← Previous
                 </button>
-                {isLast ? (
-                  <button onClick={() => setShowConfirm(true)}
-                    className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold transition">
-                    Submit Test ✓
-                  </button>
-                ) : (
-                  <button onClick={() => setCurrentQ(currentQ + 1)}
-                    className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition">
-                    Next →
-                  </button>
-                )}
-              </div>
-
-              {/* Question navigator */}
-              <div className="bg-white rounded-2xl p-5 border border-slate-200">
-                <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide mb-3">Question Navigator</p>
-                <div className="flex flex-wrap gap-2">
-                  {questions.map((question, i) => (
-                    <button key={i} onClick={() => setCurrentQ(i)}
-                      className={`w-9 h-9 rounded-lg text-sm font-semibold transition ${
-                        i === currentQ ? 'bg-slate-900 text-white shadow'
-                        : answers[question.id] ? 'bg-green-500 text-white'
-                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                      }`}>
-                      {i + 1}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex gap-4 mt-3 text-xs text-slate-400">
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-500 inline-block" /> Answered</span>
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-slate-900 inline-block" /> Current</span>
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-slate-100 border inline-block" /> Unanswered</span>
-                </div>
+                <button onClick={() => setCurrentQ(Math.min(questions.length - 1, currentQ + 1))}
+                  disabled={isLast}
+                  className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition disabled:opacity-40">
+                  Next →
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Right sidebar — camera & stats */}
-          <div className="w-56 bg-white border-l border-slate-200 p-4 flex flex-col gap-4 shadow-sm">
-            {/* Camera */}
+          {/* RIGHT sidebar — camera & stats */}
+          <div className="w-52 bg-white border-l border-slate-200 p-4 flex flex-col gap-4 shadow-sm">
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Live Camera</p>
               <div className="rounded-xl overflow-hidden bg-slate-900 aspect-video">
@@ -503,12 +501,12 @@ export default function TestRoom() {
               videoRef={videoRef}
               onBlock={(reason) => {
                 showWarningOverlay(`BLOCKED: ${reason}`)
+                clearInterval(snapshotTimer.current)
                 setStep(STEPS.SUSPENDED)
                 if (document.fullscreenElement) document.exitFullscreen()
               }}
             />
 
-            {/* Stats */}
             <div className="bg-slate-50 rounded-xl p-3 space-y-2 text-xs">
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Warnings</span>
@@ -518,13 +516,8 @@ export default function TestRoom() {
                 <span className="text-slate-500 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Answered</span>
                 <span className="font-bold text-slate-700">{answeredCount}/{questions.length}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" /> Question</span>
-                <span className="font-bold text-slate-700">{currentQ + 1}/{questions.length}</span>
-              </div>
             </div>
 
-            {/* Warning level bar */}
             <div>
               <p className="text-xs text-slate-400 mb-1">Violation level</p>
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
