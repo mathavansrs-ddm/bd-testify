@@ -64,8 +64,8 @@ def send_invite(data: schemas.InviteSend, db: Session = Depends(get_db), admin=D
     link = f"{FRONTEND_URL}/register?token={invite.token}"
     try:
         send_invite_email(to_email=data.candidate_email, candidate_name=name, test_link=link, expires_in="48 hours")
-    except Exception:
-        pass
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Invite created but email failed: {str(e)}")
 
     return invite
 
