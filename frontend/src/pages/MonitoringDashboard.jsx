@@ -243,28 +243,19 @@ export default function MonitoringDashboard() {
           <div className="bg-white w-full max-w-3xl h-full overflow-y-auto p-8">
             {/* Header */}
             <div className="flex justify-between items-start mb-5">
-              <div className="flex items-start gap-3">
-                {/* Pre-test photo */}
-                <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0 flex items-center justify-center">
-                  {(detail?.session?.photo_data || selected.photo_data)
-                    ? <img src={detail?.session?.photo_data || selected.photo_data} alt="photo" className="w-full h-full object-cover" />
-                    : <Camera className="w-5 h-5 text-gray-300" />
-                  }
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold leading-tight">{selected.candidate_name}</h3>
-                  <p className="text-sm text-gray-400">{selected.candidate_email}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium
-                      ${selected.status === 'submitted' ? 'bg-green-100 text-green-700'
-                      : selected.status === 'suspended' ? 'bg-red-100 text-red-700'
-                      : 'bg-blue-100 text-blue-700'}`}>
-                      {selected.status}
-                    </span>
-                    <span className={`text-xs font-semibold ${warningColor(selected.warning_count)}`}>
-                      {selected.warning_count}/{MAX_WARNINGS} warnings
-                    </span>
-                  </div>
+              <div>
+                <h3 className="text-lg font-semibold leading-tight">{selected.candidate_name}</h3>
+                <p className="text-sm text-gray-400">{selected.candidate_email}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium
+                    ${selected.status === 'submitted' ? 'bg-green-100 text-green-700'
+                    : selected.status === 'suspended' ? 'bg-red-100 text-red-700'
+                    : 'bg-blue-100 text-blue-700'}`}>
+                    {selected.status}
+                  </span>
+                  <span className={`text-xs font-semibold ${warningColor(selected.warning_count)}`}>
+                    {selected.warning_count}/{MAX_WARNINGS} warnings
+                  </span>
                 </div>
               </div>
               <button onClick={() => { setSelected(null); setDetail(null); setFraudLog([]) }}>
@@ -272,23 +263,41 @@ export default function MonitoringDashboard() {
               </button>
             </div>
 
-            {/* Live camera snapshot */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-semibold text-gray-800 text-sm">Live Camera</p>
-                {selected.snapshot_at && (
-                  <span className="text-xs text-gray-400">Last frame: {new Date(selected.snapshot_at).toLocaleTimeString()}</span>
-                )}
+            {/* Images row — pre-test photo + last snapshot */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              {/* Pre-test captured photo */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Pre-test Photo</p>
+                <div className="bg-slate-900 rounded-2xl overflow-hidden aspect-video flex items-center justify-center">
+                  {(detail?.session?.photo_data || selected.photo_data)
+                    ? <img src={detail?.session?.photo_data || selected.photo_data} alt="pre-test" className="w-full h-full object-cover" />
+                    : <div className="text-center text-white/40">
+                        <Camera className="w-8 h-8 mx-auto mb-1 opacity-40" />
+                        <p className="text-xs">No photo captured</p>
+                      </div>
+                  }
+                </div>
               </div>
-              <div className="bg-slate-900 rounded-2xl overflow-hidden aspect-video flex items-center justify-center">
-                {selected.latest_snapshot
-                  ? <img src={selected.latest_snapshot} alt="live" className="w-full h-full object-cover" />
-                  : <div className="text-center text-white/40">
-                      <Camera className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                      <p className="text-sm">No snapshot yet</p>
-                      <p className="text-xs opacity-60 mt-1">Snapshots upload every 30s during the test</p>
-                    </div>
-                }
+
+              {/* Last camera snapshot */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    {selected.status === 'started' ? 'Live Camera' : 'Last Snapshot'}
+                  </p>
+                  {selected.snapshot_at && (
+                    <span className="text-xs text-gray-400">{new Date(selected.snapshot_at).toLocaleTimeString()}</span>
+                  )}
+                </div>
+                <div className="bg-slate-900 rounded-2xl overflow-hidden aspect-video flex items-center justify-center">
+                  {selected.latest_snapshot
+                    ? <img src={selected.latest_snapshot} alt="snapshot" className="w-full h-full object-cover" />
+                    : <div className="text-center text-white/40">
+                        <Camera className="w-8 h-8 mx-auto mb-1 opacity-40" />
+                        <p className="text-xs">{selected.status === 'started' ? 'Waiting for snapshot…' : 'No snapshot saved'}</p>
+                      </div>
+                  }
+                </div>
               </div>
             </div>
 
