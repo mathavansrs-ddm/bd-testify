@@ -185,9 +185,18 @@ export default function MonitoringDashboard() {
                   : 'border-l-blue-400'}`}
               onClick={() => openDetail(s)}>
               <div className="flex justify-between items-start mb-3">
-                <div>
-                  <p className="font-semibold text-gray-900">{s.candidate_name}</p>
-                  <p className="text-xs text-gray-400">{s.candidate_email}</p>
+                <div className="flex items-center gap-3">
+                  {/* Candidate photo */}
+                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
+                    {s.photo_data
+                      ? <img src={s.photo_data} alt={s.candidate_name} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center text-gray-300"><Camera className="w-5 h-5" /></div>
+                    }
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">{s.candidate_name}</p>
+                    <p className="text-xs text-gray-400">{s.candidate_email}</p>
+                  </div>
                 </div>
                 {s.status === 'suspended' ? (
                   <span className="flex items-center gap-1 text-xs text-red-600 font-medium">
@@ -233,19 +242,31 @@ export default function MonitoringDashboard() {
         <div className="fixed inset-0 bg-black/50 flex justify-end z-50">
           <div className="bg-white w-full max-w-3xl h-full overflow-y-auto p-8">
             <div className="flex justify-between mb-6">
-              <div>
-                <h3 className="text-xl font-semibold">{selected.candidate_name}</h3>
-                <p className="text-sm text-gray-400">{selected.candidate_email}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium
-                    ${selected.status === 'submitted' ? 'bg-green-100 text-green-700'
-                    : selected.status === 'suspended' ? 'bg-red-100 text-red-700'
-                    : 'bg-blue-100 text-blue-700'}`}>
-                    {selected.status}
-                  </span>
-                  <span className={`text-xs font-semibold ${warningColor(selected.warning_count)}`}>
-                    {selected.warning_count}/{MAX_WARNINGS} warnings
-                  </span>
+              <div className="flex items-start gap-4">
+                {/* Pre-test captured photo */}
+                <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-100 border-2 border-gray-200 flex-shrink-0">
+                  {selected.photo_data
+                    ? <img src={selected.photo_data} alt={selected.candidate_name} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 text-xs gap-1">
+                        <Camera className="w-6 h-6" />
+                        <span>No photo</span>
+                      </div>
+                  }
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">{selected.candidate_name}</h3>
+                  <p className="text-sm text-gray-400">{selected.candidate_email}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium
+                      ${selected.status === 'submitted' ? 'bg-green-100 text-green-700'
+                      : selected.status === 'suspended' ? 'bg-red-100 text-red-700'
+                      : 'bg-blue-100 text-blue-700'}`}>
+                      {selected.status}
+                    </span>
+                    <span className={`text-xs font-semibold ${warningColor(selected.warning_count)}`}>
+                      {selected.warning_count}/{MAX_WARNINGS} warnings
+                    </span>
+                  </div>
                 </div>
               </div>
               <button onClick={() => { setSelected(null); setDetail(null); setFraudLog([]) }}>
