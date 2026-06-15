@@ -44,16 +44,23 @@ export default function TestRoom() {
   useEffect(() => {
     if (step !== STEPS.TEST) return
 
-    // Only count tab switches (not window blur which double-fires)
+    // Only flag tab switch if hidden for more than 5 seconds
+    // This avoids penalising phone calls, OS notifications, accidental swipes
+    let hiddenTimer = null
     function handleVisibility() {
       if (document.hidden) {
         const now = Date.now()
-        // Debounce: ignore if within 2 seconds of last switch
-        if (now - lastTabSwitch.current < 2000) return
-        lastTabSwitch.current = now
-        tabSwitchCount.current += 1
-        reportEvent('tab_switch')
-        showWarningOverlay('Tab switch detected! Stay on the test page.')
+        if (now - lastTabSwitch.current < 3000) return // debounce rapid re-triggers
+        hiddenTimer = setTimeout(() => {
+          // Still hidden after 5s → real tab switch
+          lastTabSwitch.current = Date.now()
+          tabSwitchCount.current += 1
+          reportEvent('tab_switch')
+          showWarningOverlay('Tab switch detected! Return to the test immediately.')
+        }, 5000)
+      } else {
+        // Returned within 5s → cancel, no penalty
+        clearTimeout(hiddenTimer)
       }
     }
 
@@ -89,6 +96,7 @@ export default function TestRoom() {
     document.addEventListener('fullscreenchange', handleFullscreenChange)
 
     return () => {
+      clearTimeout(hiddenTimer)
       document.removeEventListener('visibilitychange', handleVisibility)
       document.removeEventListener('contextmenu', handleContextMenu)
       document.removeEventListener('keydown', handleKeyDown)
@@ -100,7 +108,12 @@ export default function TestRoom() {
     if (!sessionData) return
     try {
       const r = await logEvent({ session_id: sessionData.session_id, event_type: eventType })
-      setWarningCount(r.data.warning_count)
+      const wc = r.data.warning_count
+      setWarningCount(wc)
+      // At 4/5 — loud last-chance alert prompting candidate to submit
+      if (wc === MAX_WARNINGS - 1) {
+        showWarningOverlay(`⚠️ FINAL WARNING (${wc}/${MAX_WARNINGS}) — One more violation will suspend your test! Submit now if done.`, true)
+      }
       if (r.data.warning_count >= MAX_WARNINGS || r.data.suspended) autoSuspend()
     } catch {}
   }
@@ -460,6 +473,12 @@ export default function TestRoom() {
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <QuestionCard question={q} selectedOption={answers[q.id]} onSelect={handleAnswer} index={currentQ} />
               </div>
+              {answeredCount === questions.length && (
+                <button onClick={() => setShowConfirm(true)}
+                  className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold transition">
+                  ✓ All Answered — Submit Test
+                </button>
+              )}
               <div className="flex gap-3">
                 <button onClick={() => setCurrentQ(Math.max(0, currentQ - 1))} disabled={currentQ === 0}
                   className="flex-1 py-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium hover:bg-slate-50 disabled:opacity-40 transition">
@@ -520,7 +539,14 @@ export default function TestRoom() {
 
           {/* Fixed bottom nav bar */}
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-3 py-2 z-20 shadow-lg">
-            <div className="flex items-center gap-2 mb-2">
+            {/* Submit bar — shows whenever all questions answered */}
+            {answeredCount === questions.length && (
+              <button onClick={() => setShowConfirm(true)}
+                className="w-full mb-2 py-2.5 rounded-xl bg-green-600 text-white text-sm font-bold">
+                ✓ All Answered — Submit Test
+              </button>
+            )}
+            <div className="flex items-center gap-2">
               <button onClick={() => setCurrentQ(Math.max(0, currentQ - 1))} disabled={currentQ === 0}
                 className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-medium disabled:opacity-40">
                 ← Prev
