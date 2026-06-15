@@ -55,7 +55,8 @@ export default function CandidateRegister() {
     }
   }
 
-  if (!REGISTRATION_OPEN) {
+  // Only block walk-ins when paused — candidates with a valid invite token bypass the pause
+  if (!REGISTRATION_OPEN && !token) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow p-10 max-w-md w-full text-center">
