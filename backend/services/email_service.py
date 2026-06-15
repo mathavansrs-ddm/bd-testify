@@ -1,32 +1,46 @@
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
+
 def _send_email(to_email: str, subject: str, html_body: str):
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    api_key = os.getenv("SENDGRID_API_KEY", "")
+    from_email = os.getenv("FROM_EMAIL", "bdtestifyinfo@gmail.com")
     from_name = os.getenv("FROM_NAME", "BD Testify")
 
-    if not smtp_user or not smtp_password:
-        raise Exception("SMTP credentials not configured. Set SMTP_USER and SMTP_PASSWORD in Railway Variables.")
+    if not api_key:
+        raise Exception("SENDGRID_API_KEY is not set in environment variables.")
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"{from_name} <{smtp_user}>"
-    msg["To"] = to_email
-    msg.attach(MIMEText(html_body, "html"))
+    import urllib.request
+    import urllib.error
+    import json
 
-    with smtplib.SMTP(smtp_host, smtp_port) as server:
-        server.ehlo()
-        server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_user, to_email, msg.as_string())
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": from_email, "name": from_name},
+        "subject": subject,
+        "content": [{"type": "text/html", "value": html_body}]
+    }
+
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.sendgrid.com/v3/mail/send",
+        data=data,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req) as resp:
+            if resp.status not in (200, 201, 202):
+                raise Exception(f"SendGrid returned status {resp.status}")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        raise Exception(f"SendGrid error {e.code}: {body}")
 
 
 def send_invite_email(to_email: str, candidate_name: str, test_link: str, expires_in: str = "24 hours"):
@@ -130,26 +144,3 @@ def send_result_email(to_email: str, candidate_name: str, score: int, total: int
     </html>
     """
     _send_email(to_email, subject, html_body)
-
-
-# Celery task wrapper (optional, for bulk sending)
-try:
-    from celery import Celery
-    import os
-
-    celery_app = Celery(
-        "email_tasks",
-        broker=os.getenv("REDIS_URL", "redis://localhost:6379"),
-        backend=os.getenv("REDIS_URL", "redis://localhost:6379"),
-    )
-
-    @celery_app.task
-    def send_invite_email_task(to_email, candidate_name, test_link, expires_in="24 hours"):
-        send_invite_email(to_email, candidate_name, test_link, expires_in)
-
-    @celery_app.task
-    def send_result_email_task(to_email, candidate_name, score, total, percentage, test_set_name):
-        send_result_email(to_email, candidate_name, score, total, percentage, test_set_name)
-
-except ImportError:
-    pass
