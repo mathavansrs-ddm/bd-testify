@@ -63,20 +63,28 @@ export default function QuestionManager() {
   async function handleBulkUpload(e) {
     const file = e.target.files[0]
     if (!file) return
+    if (!bulkTestSetId) {
+      toast.error('Please select a test set before uploading.')
+      e.target.value = ''
+      return
+    }
     const fd = new FormData()
     fd.append('file', file)
     try {
-      const r = await bulkUploadQuestions(fd, bulkTestSetId || null)
+      const r = await bulkUploadQuestions(fd, bulkTestSetId)
       const { created, errors } = r.data
-      if (errors.length > 0) {
-        toast.error(`${created} uploaded, ${errors.length} errors: ${errors[0]?.error}`)
+      console.log('Bulk upload errors:', errors)
+      if (errors.length > 0 && created === 0) {
+        toast.error(`All rows failed. First error (row ${errors[0]?.row}): ${errors[0]?.error}`, { duration: 8000 })
+      } else if (errors.length > 0) {
+        toast.error(`${created} uploaded, ${errors.length} failed. First error: ${errors[0]?.error}`, { duration: 8000 })
       } else {
         toast.success(`${created} questions uploaded successfully!`)
       }
       loadQuestions()
     } catch (err) {
       const detail = err.response?.data?.detail || err.message || 'Upload failed'
-      toast.error(`Upload error: ${detail}`)
+      toast.error(`Upload error: ${detail}`, { duration: 8000 })
       console.error('Bulk upload error:', err.response?.data)
     }
     e.target.value = ''
