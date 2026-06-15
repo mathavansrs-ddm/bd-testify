@@ -298,6 +298,7 @@ class SessionOut(BaseModel):
     is_reviewed: bool
     ip_address: Optional[str] = None
     browser_info: Optional[str] = None
+    photo_data: Optional[str] = None
 
     class Config:
         from_attributes = True

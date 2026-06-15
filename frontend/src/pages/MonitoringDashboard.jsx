@@ -244,12 +244,12 @@ export default function MonitoringDashboard() {
             <div className="flex justify-between mb-6">
               <div className="flex items-start gap-4">
                 {/* Pre-test captured photo */}
-                <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-100 border-2 border-gray-200 flex-shrink-0">
-                  {selected.photo_data
-                    ? <img src={selected.photo_data} alt={selected.candidate_name} className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 text-xs gap-1">
+                <div className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-100 border-2 border-gray-200 flex-shrink-0 flex items-center justify-center">
+                  {(detail?.session?.photo_data || selected.photo_data)
+                    ? <img src={detail?.session?.photo_data || selected.photo_data} alt={selected.candidate_name} className="w-full h-full object-cover" />
+                    : <div className="flex flex-col items-center justify-center gap-1 text-gray-400">
                         <Camera className="w-6 h-6" />
-                        <span>No photo</span>
+                        <span className="text-xs">No photo</span>
                       </div>
                   }
                 </div>
