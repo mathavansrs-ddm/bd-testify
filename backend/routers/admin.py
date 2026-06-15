@@ -616,3 +616,34 @@ def export_results(db: Session = Depends(get_db), admin=Depends(get_current_admi
 def get_settings(admin=Depends(get_current_admin)):
     """Global settings are now managed per test-set. This endpoint returns info."""
     return {"message": "Settings are configured per test set. Edit each test set individually."}
+
+
+@router.delete("/cleanup/load-test")
+def cleanup_load_test(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    """Remove all load-test candidates and their associated data (emails ending in @bdtest.invalid)."""
+    candidates = db.query(models.Candidate).filter(
+        models.Candidate.email.like("%@bdtest.invalid")
+    ).all()
+
+    deleted_candidates = 0
+    deleted_sessions = 0
+    deleted_invites = 0
+
+    for c in candidates:
+        sessions = db.query(models.TestSession).filter(models.TestSession.candidate_id == c.id).all()
+        for s in sessions:
+            db.query(models.CheatingLog).filter(models.CheatingLog.session_id == s.id).delete()
+            db.query(models.Answer).filter(models.Answer.session_id == s.id).delete()
+            db.delete(s)
+            deleted_sessions += 1
+        db.query(models.TestInvite).filter(models.TestInvite.candidate_email == c.email).delete()
+        deleted_invites += 1
+        db.delete(c)
+        deleted_candidates += 1
+
+    db.commit()
+    return {
+        "deleted_candidates": deleted_candidates,
+        "deleted_sessions": deleted_sessions,
+        "deleted_invites": deleted_invites,
+    }
