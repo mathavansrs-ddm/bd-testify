@@ -3,6 +3,7 @@ import { RefreshCw, AlertTriangle, Eye, X, CheckCircle, StopCircle, ShieldOff, A
 import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
 import { getActiveSessions, getAdminSession, markSessionReviewed, suspendTest, getFraudLog, deleteSession } from '../services/api'
+import { formatIST, formatISTTime } from '../utils/dateFormat'
 
 const EVENT_LABELS = {
   face_not_detected: 'No face detected',
@@ -190,7 +191,7 @@ export default function MonitoringDashboard() {
                       </div>
                       {s.snapshot_at && (
                         <p className="text-xs text-gray-300 mt-1">
-                          Last frame: {new Date(s.snapshot_at).toLocaleTimeString()}
+                          Last frame: {formatISTTime(s.snapshot_at)}
                         </p>
                       )}
                     </div>
@@ -323,7 +324,7 @@ export default function MonitoringDashboard() {
                     {selected.status === 'started' ? 'Live Camera' : 'Last Snapshot'}
                   </p>
                   {selected.snapshot_at && (
-                    <span className="text-xs text-gray-400">{new Date(selected.snapshot_at).toLocaleTimeString()}</span>
+                    <span className="text-xs text-gray-400">{formatISTTime(selected.snapshot_at)}</span>
                   )}
                 </div>
                 <div className="bg-slate-900 rounded-2xl overflow-hidden aspect-video flex items-center justify-center relative">
@@ -357,7 +358,7 @@ export default function MonitoringDashboard() {
                         <span className="font-bold text-gray-500">#{i + 1}</span>
                         <div className="flex-1">
                           <span className="font-medium">{EVENT_LABELS[l.event_type] || l.event_type}</span>
-                          <span className="ml-2 text-gray-400">{new Date(l.detected_at).toLocaleTimeString()}</span>
+                          <span className="ml-2 text-gray-400">{formatISTTime(l.detected_at)}</span>
                         </div>
                         <span className={`px-1.5 py-0.5 rounded font-medium
                           ${l.auto_action_taken === 'block' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
@@ -386,7 +387,7 @@ export default function MonitoringDashboard() {
                           : 'bg-yellow-100 text-yellow-700'}`}>
                           {log.auto_action_taken}
                         </span>
-                        <span className="text-gray-400 text-xs">{new Date(log.detected_at).toLocaleTimeString()}</span>
+                        <span className="text-gray-400 text-xs">{formatISTTime(log.detected_at)}</span>
                       </div>
                     ))}
                   </div>

@@ -4,6 +4,7 @@ import { Users, ClipboardList, BarChart2, Eye, Settings } from 'lucide-react'
 import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
 import { getDashboardStats, getAdminSessions, updateSettings } from '../services/api'
+import { formatIST } from '../utils/dateFormat'
 
 function StatCard({ icon: Icon, label, value, color }) {
   return (
@@ -102,7 +103,7 @@ export default function AdminDashboard() {
                       {s.status === 'submitted' ? `${s.score}/${s.total_marks} (${s.percentage}%)` : '—'}
                     </td>
                     <td className="px-6 py-4 text-gray-600">{s.warning_count}</td>
-                    <td className="px-6 py-4 text-gray-500">{new Date(s.started_at).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-gray-500">{formatIST(s.started_at)}</td>
                   </tr>
                 ))}
               </tbody>

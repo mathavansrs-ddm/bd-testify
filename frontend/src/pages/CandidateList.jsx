@@ -3,6 +3,7 @@ import { Search, Download, Upload, UserPlus, RefreshCw, ChevronRight, X, ShieldO
 import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
 import { getCandidates, getCandidate, addCandidate, bulkUploadCandidates, downloadCandidateTemplate, allowReattempt, exportCandidates, unblockCandidate, getFraudLog } from '../services/api'
+import { formatIST, formatISTTime, formatISTDate } from '../utils/dateFormat'
 
 const STATUS_BADGE = { submitted: 'badge-submitted', started: 'badge-started', suspended: 'badge-suspended', flagged: 'badge-flagged' }
 const EVENT_LABELS = { face_not_detected: 'No face', multiple_faces: 'Multiple faces / Impersonator', tab_switch: 'Tab switch', fullscreen_exit: 'Fullscreen exit', copy_attempt: 'Copy attempt', suspicious_audio: 'Suspicious audio' }
@@ -339,7 +340,7 @@ export default function CandidateList() {
                     ...(detail.candidate.candidate_type === 'internal'
                       ? [['Department', detail.candidate.department || '—'], ['Employee ID', detail.candidate.employee_id || '—']]
                       : [['Degree', detail.candidate.degree || '—'], ['Year', detail.candidate.year_of_study || '—'], ['College', detail.candidate.college_name || '—']]),
-                    ['Registered', new Date(detail.candidate.registered_at).toLocaleDateString()],
+                    ['Registered', formatISTDate(detail.candidate.registered_at)],
                   ].map(([k, v]) => (
                     <div key={k}><p className="text-gray-400 text-xs">{k}</p><p className="font-medium text-gray-900">{v}</p></div>
                   ))}
@@ -359,7 +360,7 @@ export default function CandidateList() {
                     <div key={s.id} className="border border-gray-100 rounded-lg p-4 mb-3">
                       <div className="flex justify-between mb-2">
                         <span className={STATUS_BADGE[s.status] || 'badge-invited'}>{s.status}</span>
-                        <span className="text-xs text-gray-400">{new Date(s.started_at).toLocaleString()}</span>
+                        <span className="text-xs text-gray-400">{formatIST(s.started_at)}</span>
                       </div>
                       {s.status === 'submitted' && <p className="text-sm">Score: <strong>{s.score}/{s.total_marks}</strong> ({s.percentage}%)</p>}
                       <p className="text-xs text-gray-500 mt-1">Warnings: {s.warning_count} | Tab switches: {s.tab_switch_count}</p>
@@ -377,7 +378,7 @@ export default function CandidateList() {
                           <div className="flex-1">
                             <span className="font-medium">{EVENT_LABELS[l.event_type] || l.event_type}</span>
                             {l.block_reason && <span className="ml-2 text-red-600">— {l.block_reason}</span>}
-                            <span className="ml-2 text-gray-400">{new Date(l.detected_at).toLocaleTimeString()}</span>
+                            <span className="ml-2 text-gray-400">{formatISTTime(l.detected_at)}</span>
                           </div>
                           <span className={`px-1.5 py-0.5 rounded font-medium ${l.auto_action_taken === 'block' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{l.auto_action_taken}</span>
                         </div>

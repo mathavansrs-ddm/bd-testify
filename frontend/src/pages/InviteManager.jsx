@@ -3,6 +3,7 @@ import { Send, QrCode, Download, RefreshCw, Users, Link, Copy, CheckCheck } from
 import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
 import { sendInvite, bulkSendInvites, generateQR, getInviteHistory, getTestSets } from '../services/api'
+import { formatIST } from '../utils/dateFormat'
 
 const STATUS_COLOR = { pending: 'badge-invited', used: 'badge-submitted', expired: 'badge-suspended' }
 
@@ -154,7 +155,7 @@ export default function InviteManager() {
                   <div key={inv.id} className="flex items-center gap-3 py-2 border-b border-gray-50">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{inv.email}</p>
-                      <p className="text-xs text-gray-400">{inv.candidate_name} · {new Date(inv.sent_at).toLocaleString()}</p>
+                      <p className="text-xs text-gray-400">{inv.candidate_name} · {formatIST(inv.sent_at)}</p>
                     </div>
                     <span className={STATUS_COLOR[inv.status] || 'badge-invited'}>{inv.status}</span>
                     {inv.status === 'pending' && (
