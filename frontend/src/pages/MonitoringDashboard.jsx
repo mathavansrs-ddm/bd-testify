@@ -134,7 +134,7 @@ export default function MonitoringDashboard() {
         {tab === 'cameras' && (
           <div>
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-gray-500">Live camera snapshots — auto-refreshes every 10s. Candidates upload frames every 30s.</p>
+              <p className="text-sm text-gray-500">Live camera snapshots — auto-refreshes every 10s. Candidates upload frames every 5s.</p>
               <button onClick={() => { load(); setCameraRefresh(r => r + 1) }} className="btn-secondary flex items-center gap-2 text-sm">
                 <RefreshCw className="w-4 h-4" /> Refresh
               </button>
