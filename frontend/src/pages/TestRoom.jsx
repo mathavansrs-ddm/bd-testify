@@ -26,6 +26,7 @@ export default function TestRoom() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [showNavModal, setShowNavModal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [startingTest, setStartingTest] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [cameraOk, setCameraOk] = useState(false)
@@ -118,11 +119,10 @@ export default function TestRoom() {
     } catch {}
   }
 
-  // countAsViolation=true means it logs to backend, false means just show UI warning
-  function showWarningOverlay(msg, countAsViolation = true) {
+  function showWarningOverlay(msg) {
     setWarningMsg(msg)
     setShowWarning(true)
-    setTimeout(() => setShowWarning(false), 5000)
+    // Don't auto-dismiss — candidate must click "Continue Test"
   }
 
   function autoSuspend() {
@@ -180,27 +180,36 @@ export default function TestRoom() {
   }
 
   async function startTestSession() {
+    setStartingTest(true)
     try {
       await document.documentElement.requestFullscreen()
     } catch {
       toast.error('Please allow fullscreen access to start the test.')
+      setStartingTest(false)
       return
     }
     try {
       const r = await startTest(token)
       setSessionData(r.data)
       const sid = r.data.session_id
-      // Upload pre-test photo
       if (photoDataUrl) {
         uploadPhoto({ session_id: sid, image: photoDataUrl }).catch(() => {})
       }
-      // Start periodic snapshot every 5s for near-live monitoring
       sendSnapshot(sid)
       snapshotTimer.current = setInterval(() => sendSnapshot(sid), 5000)
       setStep(STEPS.TEST)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to start test. Please check your invite link.')
-      setStep(STEPS.ERROR)
+      if (document.fullscreenElement) document.exitFullscreen()
+      const msg = err.response?.data?.detail || 'Failed to start test.'
+      // Don't hard-navigate to ERROR for network hiccups — show toast and let candidate retry
+      if (err.response?.status === 400 || err.response?.status === 403 || err.response?.status === 404) {
+        setError(msg)
+        setStep(STEPS.ERROR)
+      } else {
+        toast.error(msg + ' Please try again.')
+      }
+    } finally {
+      setStartingTest(false)
     }
   }
 
@@ -314,13 +323,17 @@ export default function TestRoom() {
               </ul>
             </div>
 
-            <button onClick={startTestSession} disabled={!cameraOk || !photoCaptured}
+            <button onClick={startTestSession} disabled={!cameraOk || !photoCaptured || startingTest}
               className={`w-full py-4 rounded-2xl font-semibold text-base transition ${
-                cameraOk && photoCaptured
+                cameraOk && photoCaptured && !startingTest
                   ? 'bg-gradient-to-r from-slate-900 to-blue-900 text-white hover:opacity-90 shadow-lg'
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed'
               }`}>
-              {!cameraOk ? 'Verify Camera to Continue' : !photoCaptured ? 'Capture Photo to Continue' : 'Start Test in Fullscreen →'}
+              {startingTest
+                ? <span className="flex items-center justify-center gap-2"><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Starting test…</span>
+                : !cameraOk ? 'Verify Camera to Continue'
+                : !photoCaptured ? 'Capture Photo to Continue'
+                : 'Start Test in Fullscreen →'}
             </button>
           </div>
         </div>
@@ -398,14 +411,50 @@ export default function TestRoom() {
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col select-none">
 
-        {/* Warning overlay */}
+        {/* Warning modal — candidate must acknowledge */}
         {showWarning && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[90vw] max-w-sm">
-            <div className="bg-red-600 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-start gap-3 border border-red-400">
-              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold text-sm">Warning {warningCount}/{MAX_WARNINGS}</p>
-                <p className="text-xs opacity-90 mt-0.5">{warningMsg}</p>
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden">
+              {/* Red header */}
+              <div className={`px-6 pt-6 pb-4 ${warningCount >= MAX_WARNINGS - 1 ? 'bg-red-600' : 'bg-orange-500'}`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-lg leading-tight">
+                      Warning {warningCount}/{MAX_WARNINGS}
+                    </p>
+                    <p className="text-white/80 text-xs mt-0.5">Proctoring violation detected</p>
+                  </div>
+                </div>
+              </div>
+              {/* Body */}
+              <div className="px-6 py-4">
+                <p className="text-gray-700 text-sm">{warningMsg}</p>
+                {warningCount >= MAX_WARNINGS - 1 && (
+                  <div className="mt-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-700 font-medium">
+                    ⚠️ One more violation will suspend your test permanently!
+                  </div>
+                )}
+                {/* Violation bar */}
+                <div className="mt-4">
+                  <div className="flex justify-between text-xs text-gray-400 mb-1">
+                    <span>Violation level</span>
+                    <span>{warningCount}/{MAX_WARNINGS}</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${warningCount <= 2 ? 'bg-yellow-400' : warningCount <= 3 ? 'bg-orange-500' : 'bg-red-500'}`}
+                      style={{ width: `${(warningCount / MAX_WARNINGS) * 100}%` }} />
+                  </div>
+                </div>
+              </div>
+              {/* Continue button */}
+              <div className="px-6 pb-6">
+                <button onClick={() => setShowWarning(false)}
+                  className="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-700 text-white font-semibold text-sm transition">
+                  I Understand — Continue Test
+                </button>
               </div>
             </div>
           </div>
