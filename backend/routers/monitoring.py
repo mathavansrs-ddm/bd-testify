@@ -12,8 +12,8 @@ from auth import get_current_admin
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
 # Thresholds — must match frontend constants
-WARN_THRESHOLD  = 3   # warnings before auto-block
-FRAUD_THRESHOLD = 2   # fraud strikes (multiple faces / impersonation) before block
+WARN_THRESHOLD  = 5   # warnings before auto-block
+FRAUD_THRESHOLD = 3   # fraud strikes (multiple faces / impersonation) before block
 
 
 class FraudBlockRequest(BaseModel):
@@ -121,10 +121,16 @@ def get_fraud_log(session_id: int, db: Session = Depends(get_db), admin=Depends(
 
 
 @router.get("/active-sessions")
-def get_active_sessions(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
-    sessions = db.query(models.TestSession).filter(
-        models.TestSession.status == models.SessionStatus.started
-    ).all()
+def get_active_sessions(status: Optional[str] = None, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    if status == "completed":
+        sessions = db.query(models.TestSession).filter(
+            models.TestSession.status.in_([models.SessionStatus.submitted, models.SessionStatus.suspended])
+        ).order_by(models.TestSession.submitted_at.desc()).limit(100).all()
+    else:
+        sessions = db.query(models.TestSession).filter(
+            models.TestSession.status == models.SessionStatus.started
+        ).all()
+
     result = []
     for s in sessions:
         candidate = db.query(models.Candidate).filter(models.Candidate.id == s.candidate_id).first()
@@ -134,10 +140,12 @@ def get_active_sessions(db: Session = Depends(get_db), admin=Depends(get_current
             "candidate_name": candidate.name if candidate else "Unknown",
             "candidate_email": candidate.email if candidate else None,
             "started_at": s.started_at,
+            "submitted_at": s.submitted_at if hasattr(s, 'submitted_at') else None,
             "elapsed_minutes": elapsed,
             "warning_count": s.warning_count,
             "tab_switch_count": s.tab_switch_count,
             "status": s.status,
+            "score": s.score if hasattr(s, 'score') else None,
             "is_blocked": candidate.is_blocked if candidate else False,
             "block_reason": candidate.block_reason if candidate else None,
         })

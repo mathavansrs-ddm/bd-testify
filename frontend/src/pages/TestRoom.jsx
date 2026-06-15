@@ -10,6 +10,7 @@ import AntiCheat from '../components/AntiCheat'
 import { AlertTriangle, CheckCircle, Camera } from 'lucide-react'
 
 const STEPS = { SYSTEM_CHECK: 'system_check', TEST: 'test', FINISHED: 'finished', ERROR: 'error', SUSPENDED: 'suspended' }
+const MAX_WARNINGS = 5
 
 export default function TestRoom() {
   const { token } = useParams()
@@ -40,8 +41,8 @@ export default function TestRoom() {
       if (document.hidden) {
         tabSwitchCount.current += 1
         reportEvent('tab_switch')
-        showWarningOverlay(`Tab switch detected! (${tabSwitchCount.current}/3 allowed)`)
-        if (tabSwitchCount.current > 2) {
+        showWarningOverlay(`Tab switch detected!`, warningCount + 1)
+        if (tabSwitchCount.current >= MAX_WARNINGS) {
           autoSuspend()
         }
       }
@@ -62,14 +63,14 @@ export default function TestRoom() {
       if (blocked) {
         e.preventDefault()
         reportEvent('copy_attempt')
-        showWarningOverlay('Keyboard shortcuts are disabled during the test.')
+        showWarningOverlay('Keyboard shortcuts are disabled during the test.', warningCount + 1)
       }
     }
 
     function handleFullscreenChange() {
       if (!document.fullscreenElement) {
         reportEvent('fullscreen_exit')
-        showWarningOverlay('Please return to fullscreen mode to continue.')
+        showWarningOverlay('Please return to fullscreen mode to continue.', warningCount + 1)
         document.documentElement.requestFullscreen().catch(() => {})
       }
     }
@@ -94,14 +95,15 @@ export default function TestRoom() {
     try {
       const r = await logEvent({ session_id: sessionData.session_id, event_type: eventType })
       setWarningCount(r.data.warning_count)
-      if (r.data.suspended) autoSuspend()
+      if (r.data.warning_count >= MAX_WARNINGS || r.data.suspended) autoSuspend()
     } catch {}
   }
 
-  function showWarningOverlay(msg) {
-    setWarningMsg(msg)
+  function showWarningOverlay(msg, count) {
+    const displayCount = count ?? (warningCount + 1)
+    setWarningMsg(`⚠️ Warning ${displayCount}/${MAX_WARNINGS}: ${msg}`)
     setShowWarning(true)
-    setTimeout(() => setShowWarning(false), 4000)
+    setTimeout(() => setShowWarning(false), 5000)
   }
 
   function autoSuspend() {

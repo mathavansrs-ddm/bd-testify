@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, AlertTriangle, Eye, X, CheckCircle, StopCircle, ShieldOff } from 'lucide-react'
+import { RefreshCw, AlertTriangle, Eye, X, CheckCircle, StopCircle, ShieldOff, Activity, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
 import { getActiveSessions, getAdminSession, markSessionReviewed, suspendTest, getFraudLog } from '../services/api'
@@ -13,7 +13,10 @@ const EVENT_LABELS = {
   suspicious_audio:  'Suspicious audio',
 }
 
+const MAX_WARNINGS = 5
+
 export default function MonitoringDashboard() {
+  const [tab, setTab] = useState('ongoing')
   const [sessions, setSessions] = useState([])
   const [selected, setSelected] = useState(null)
   const [detail, setDetail] = useState(null)
@@ -21,12 +24,15 @@ export default function MonitoringDashboard() {
 
   useEffect(() => {
     load()
-    const id = setInterval(load, 10000)
+    const id = setInterval(() => { if (tab === 'ongoing') load() }, 10000)
     return () => clearInterval(id)
-  }, [])
+  }, [tab])
 
   async function load() {
-    try { const r = await getActiveSessions(); setSessions(r.data) } catch {}
+    try {
+      const r = await getActiveSessions(tab === 'completed' ? 'completed' : null)
+      setSessions(r.data)
+    } catch {}
   }
 
   async function openDetail(session) {
@@ -60,11 +66,34 @@ export default function MonitoringDashboard() {
     } catch { toast.error('Failed') }
   }
 
+  const warningColor = (count) => {
+    if (count >= MAX_WARNINGS) return 'text-red-600'
+    if (count >= 3) return 'text-orange-500'
+    return 'text-gray-900'
+  }
+
   return (
-    <AdminLayout title="Live Monitoring">
+    <AdminLayout title="Monitoring">
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <p className="text-sm text-gray-500">{sessions.length} active session{sessions.length !== 1 ? 's' : ''} — auto-refreshes every 10s</p>
+        {/* Tabs */}
+        <div className="flex items-center justify-between">
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+            <button onClick={() => { setTab('ongoing'); setSelected(null) }}
+              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors
+                ${tab === 'ongoing' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              <Activity className="w-4 h-4 text-green-500" /> Ongoing
+              {tab === 'ongoing' && sessions.length > 0 && (
+                <span className="bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {sessions.length}
+                </span>
+              )}
+            </button>
+            <button onClick={() => { setTab('completed'); setSelected(null) }}
+              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors
+                ${tab === 'completed' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              <Clock className="w-4 h-4 text-blue-500" /> Completed
+            </button>
+          </div>
           <button onClick={load} className="btn-secondary flex items-center gap-2">
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
@@ -73,7 +102,7 @@ export default function MonitoringDashboard() {
         {sessions.length === 0 && (
           <div className="text-center py-20 text-gray-400">
             <Eye className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>No active test sessions right now</p>
+            <p>{tab === 'ongoing' ? 'No active test sessions right now' : 'No completed sessions yet'}</p>
           </div>
         )}
 
@@ -81,16 +110,23 @@ export default function MonitoringDashboard() {
           {sessions.map((s) => (
             <div key={s.session_id}
               className={`card cursor-pointer hover:shadow-md transition-shadow border-l-4
-                ${s.is_blocked ? 'border-l-red-500 bg-red-50' : s.warning_count > 2 ? 'border-l-orange-400' : 'border-l-blue-400'}`}
+                ${s.is_blocked || s.status === 'suspended' ? 'border-l-red-500 bg-red-50'
+                  : s.warning_count >= 3 ? 'border-l-orange-400'
+                  : s.status === 'submitted' ? 'border-l-green-400'
+                  : 'border-l-blue-400'}`}
               onClick={() => openDetail(s)}>
               <div className="flex justify-between items-start mb-3">
                 <div>
                   <p className="font-semibold text-gray-900">{s.candidate_name}</p>
                   <p className="text-xs text-gray-400">{s.candidate_email}</p>
                 </div>
-                {s.is_blocked ? (
+                {s.status === 'suspended' ? (
                   <span className="flex items-center gap-1 text-xs text-red-600 font-medium">
-                    <ShieldOff className="w-3 h-3" /> Blocked
+                    <ShieldOff className="w-3 h-3" /> Suspended
+                  </span>
+                ) : s.status === 'submitted' ? (
+                  <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                    <CheckCircle className="w-3 h-3" /> Submitted
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
@@ -103,21 +139,18 @@ export default function MonitoringDashboard() {
                   <p className="font-bold text-gray-900">{s.elapsed_minutes}m</p>
                   <p className="text-gray-400">Elapsed</p>
                 </div>
-                <div className={`rounded p-2 ${s.warning_count > 2 ? 'bg-red-50' : 'bg-gray-50'}`}>
-                  <p className={`font-bold ${s.warning_count > 2 ? 'text-red-600' : 'text-gray-900'}`}>{s.warning_count}</p>
+                <div className={`rounded p-2 ${s.warning_count >= 3 ? 'bg-red-50' : 'bg-gray-50'}`}>
+                  <p className={`font-bold ${warningColor(s.warning_count)}`}>{s.warning_count}/{MAX_WARNINGS}</p>
                   <p className="text-gray-400">Warnings</p>
                 </div>
                 <div className="bg-gray-50 rounded p-2">
-                  <p className="font-bold text-gray-900">{s.tab_switch_count}</p>
-                  <p className="text-gray-400">Tab sw.</p>
+                  <p className="font-bold text-gray-900">{s.score ?? '—'}</p>
+                  <p className="text-gray-400">Score</p>
                 </div>
               </div>
-              {s.is_blocked && s.block_reason && (
-                <p className="mt-2 text-xs text-red-600 truncate">{s.block_reason}</p>
-              )}
-              {!s.is_blocked && s.warning_count > 2 && (
+              {s.warning_count >= 3 && s.status === 'started' && (
                 <div className="flex items-center gap-1 mt-3 text-xs text-orange-600">
-                  <AlertTriangle className="w-3 h-3" /> High warning count — review now
+                  <AlertTriangle className="w-3 h-3" /> {s.warning_count}/{MAX_WARNINGS} warnings — review now
                 </div>
               )}
             </div>
@@ -133,33 +166,37 @@ export default function MonitoringDashboard() {
               <div>
                 <h3 className="text-xl font-semibold">{selected.candidate_name}</h3>
                 <p className="text-sm text-gray-400">{selected.candidate_email}</p>
-                {selected.is_blocked && (
-                  <span className="inline-flex items-center gap-1 mt-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-0.5">
-                    <ShieldOff className="w-3 h-3" /> BLOCKED — {selected.block_reason}
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium
+                    ${selected.status === 'submitted' ? 'bg-green-100 text-green-700'
+                    : selected.status === 'suspended' ? 'bg-red-100 text-red-700'
+                    : 'bg-blue-100 text-blue-700'}`}>
+                    {selected.status}
                   </span>
-                )}
+                  <span className={`text-xs font-semibold ${warningColor(selected.warning_count)}`}>
+                    {selected.warning_count}/{MAX_WARNINGS} warnings
+                  </span>
+                </div>
               </div>
               <button onClick={() => { setSelected(null); setDetail(null); setFraudLog([]) }}>
                 <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
 
-            {/* Proctoring fraud log */}
+            {/* Violations */}
             <div className="mb-6">
               <h4 className="font-semibold text-gray-800 mb-3">Proctoring Violations</h4>
               {fraudLog.length === 0
                 ? <p className="text-gray-400 text-sm">No violations detected</p>
                 : (
                   <div className="space-y-2 max-h-56 overflow-y-auto">
-                    {fraudLog.map((l) => (
+                    {fraudLog.map((l, i) => (
                       <div key={l.id}
                         className={`flex items-start gap-3 text-xs rounded-lg px-3 py-2 border
                           ${l.auto_action_taken === 'block' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                        <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0
-                          ${l.auto_action_taken === 'block' ? 'bg-red-500' : 'bg-yellow-400'}`} />
+                        <span className="font-bold text-gray-500">#{i + 1}</span>
                         <div className="flex-1">
                           <span className="font-medium">{EVENT_LABELS[l.event_type] || l.event_type}</span>
-                          {l.block_reason && <span className="ml-2 text-red-600">— {l.block_reason}</span>}
                           <span className="ml-2 text-gray-400">{new Date(l.detected_at).toLocaleTimeString()}</span>
                         </div>
                         <span className={`px-1.5 py-0.5 rounded font-medium
@@ -174,28 +211,27 @@ export default function MonitoringDashboard() {
 
             {detail && (
               <div className="space-y-6">
-                {/* Cheating log timeline */}
                 <div>
                   <h4 className="font-semibold text-gray-800 mb-3">All Events Timeline</h4>
                   {detail.cheating_logs.length === 0 && <p className="text-gray-400 text-sm">No events logged</p>}
                   <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {detail.cheating_logs.map((log) => (
+                    {detail.cheating_logs.map((log, i) => (
                       <div key={log.id} className="flex items-center gap-3 text-sm py-2 border-b border-gray-50">
+                        <span className="text-xs text-gray-400 w-6">#{i+1}</span>
                         <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
                         <span className="font-medium text-gray-700">{EVENT_LABELS[log.event_type] || log.event_type}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full
+                        <span className={`text-xs px-2 py-0.5 rounded-full ml-auto
                           ${log.auto_action_taken === 'block' ? 'bg-red-100 text-red-700'
                           : log.auto_action_taken === 'suspend' ? 'bg-orange-100 text-orange-700'
                           : 'bg-yellow-100 text-yellow-700'}`}>
                           {log.auto_action_taken}
                         </span>
-                        <span className="text-gray-400 ml-auto">{new Date(log.detected_at).toLocaleTimeString()}</span>
+                        <span className="text-gray-400 text-xs">{new Date(log.detected_at).toLocaleTimeString()}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Answer review */}
                 <div>
                   <h4 className="font-semibold text-gray-800 mb-3">Answer Review</h4>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -213,14 +249,16 @@ export default function MonitoringDashboard() {
                   </div>
                 </div>
 
-                <div className="flex gap-3">
-                  <button onClick={handleReview} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                    <CheckCircle className="w-4 h-4" /> Mark Reviewed
-                  </button>
-                  <button onClick={handleSuspend} className="btn-danger flex-1 flex items-center justify-center gap-2">
-                    <StopCircle className="w-4 h-4" /> Suspend Test
-                  </button>
-                </div>
+                {selected.status === 'started' && (
+                  <div className="flex gap-3">
+                    <button onClick={handleReview} className="btn-primary flex-1 flex items-center justify-center gap-2">
+                      <CheckCircle className="w-4 h-4" /> Mark Reviewed
+                    </button>
+                    <button onClick={handleSuspend} className="btn-danger flex-1 flex items-center justify-center gap-2">
+                      <StopCircle className="w-4 h-4" /> Suspend Test
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

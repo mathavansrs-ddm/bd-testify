@@ -81,7 +81,7 @@ export const suspendTest = (sessionId) => api.post(`/test/suspend/${sessionId}`)
 // Monitoring
 export const logEvent = (data) => api.post('/monitoring/event', data)
 export const fraudBlock = (data) => api.post('/monitoring/fraud-block', data)
-export const getActiveSessions = () => api.get('/monitoring/active-sessions')
+export const getActiveSessions = (status = null) => api.get('/monitoring/active-sessions', { params: status ? { status } : {} })
 export const getFraudLog = (sessionId) => api.get(`/monitoring/fraud-log/${sessionId}`)
 
 // Candidates — admin actions

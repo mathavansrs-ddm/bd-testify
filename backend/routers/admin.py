@@ -323,14 +323,43 @@ def get_candidate(id: int, db: Session = Depends(get_db), admin=Depends(get_curr
 
 @router.put("/candidates/{id}/reattempt")
 def allow_reattempt(id: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    import uuid
+    from datetime import timedelta
+    from routers.invite import FRONTEND_URL
+    from services.email_service import send_invite_email
+
     candidate = db.query(models.Candidate).filter(models.Candidate.id == id).first()
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
+
     candidate.reattempt_allowed = True
     candidate.is_blocked = False
     candidate.block_reason = None
+
+    # Find the last test set this candidate was invited for
+    last_invite = db.query(models.TestInvite).filter(
+        models.TestInvite.candidate_email == candidate.email
+    ).order_by(models.TestInvite.created_at.desc()).first()
+
+    new_link = None
+    if last_invite:
+        token = str(uuid.uuid4())
+        new_invite = models.TestInvite(
+            candidate_email=candidate.email,
+            token=token,
+            test_set_id=last_invite.test_set_id,
+            expires_at=datetime.utcnow() + timedelta(hours=48),
+            created_by=admin.id,
+        )
+        db.add(new_invite)
+        new_link = f"{FRONTEND_URL}/register?token={token}"
+        try:
+            send_invite_email(candidate.email, candidate.name, new_link, "48 hours")
+        except Exception:
+            pass
+
     db.commit()
-    return {"message": "Reattempt allowed for candidate"}
+    return {"message": "Reattempt allowed and new invite sent", "test_link": new_link}
 
 
 @router.put("/candidates/{id}/unblock")
