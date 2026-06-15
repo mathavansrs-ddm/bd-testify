@@ -19,7 +19,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 def _create_invite(candidate_email: str, test_set_id: int, admin_id: int, db: Session) -> models.TestInvite:
     """
     Create an invite for any email — the candidate does NOT need to be pre-registered.
-    If they aren't registered yet, they will register via the invite link.
+    A placeholder candidate is created if they don't exist yet; they complete registration via the link.
     """
     test_set = db.query(models.TestSet).filter(models.TestSet.id == test_set_id).first()
     if not test_set:
@@ -29,7 +29,6 @@ def _create_invite(candidate_email: str, test_set_id: int, admin_id: int, db: Se
     if candidate:
         if candidate.is_blocked:
             raise HTTPException(status_code=403, detail=f"{candidate_email} is blocked")
-        # Use per-set max_attempts
         attempts = db.query(models.TestSession).filter(
             models.TestSession.candidate_id == candidate.id,
             models.TestSession.test_set_id == test_set_id,
@@ -37,6 +36,20 @@ def _create_invite(candidate_email: str, test_set_id: int, admin_id: int, db: Se
         ).count()
         if attempts >= test_set.max_attempts and not candidate.reattempt_allowed:
             raise HTTPException(status_code=403, detail=f"{candidate_email} has exhausted attempts for this test")
+    else:
+        # Auto-create placeholder so FK constraint is satisfied.
+        # Name/phone will be filled when candidate registers via the invite link.
+        candidate = models.Candidate(
+            name=candidate_email,
+            email=candidate_email,
+            phone="",
+            candidate_type=models.CandidateType.external,
+            invited_by=models.InviteSource.email_invite,
+        )
+        db.add(candidate)
+        db.flush()  # get candidate into DB before inserting invite
+
+    candidate.invited_by = models.InviteSource.email_invite
 
     token = str(uuid.uuid4())
     invite = models.TestInvite(
@@ -47,8 +60,6 @@ def _create_invite(candidate_email: str, test_set_id: int, admin_id: int, db: Se
         invited_by_admin=admin_id,
     )
     db.add(invite)
-    if candidate:
-        candidate.invited_by = models.InviteSource.email_invite
     return invite
 
 
