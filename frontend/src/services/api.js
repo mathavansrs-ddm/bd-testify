@@ -32,6 +32,7 @@ export const getDashboardStats = () => api.get('/admin/dashboard/stats')
 export const getAdminSessions = (status) => api.get('/admin/sessions', { params: { status } })
 export const getAdminSession = (id) => api.get(`/admin/sessions/${id}`)
 export const markSessionReviewed = (id) => api.put(`/admin/sessions/${id}/review`)
+export const deleteSession = (id) => api.delete(`/admin/sessions/${id}`)
 export const updateSettings = (data) => api.post('/admin/settings', data)
 
 // Questions

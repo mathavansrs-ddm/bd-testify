@@ -508,6 +508,18 @@ def get_session(id: int, db: Session = Depends(get_db), admin=Depends(get_curren
     }
 
 
+@router.delete("/sessions/{id}")
+def delete_session(id: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    session = db.query(models.TestSession).filter(models.TestSession.id == id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    db.query(models.CheatingLog).filter(models.CheatingLog.session_id == id).delete()
+    db.query(models.Answer).filter(models.Answer.session_id == id).delete()
+    db.delete(session)
+    db.commit()
+    return {"message": "Session deleted"}
+
+
 @router.put("/sessions/{id}/review")
 def mark_reviewed(id: int, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
     session = db.query(models.TestSession).filter(models.TestSession.id == id).first()

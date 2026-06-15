@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
-import { RefreshCw, AlertTriangle, Eye, X, CheckCircle, StopCircle, ShieldOff, Activity, Clock, Camera } from 'lucide-react'
+import { RefreshCw, AlertTriangle, Eye, X, CheckCircle, StopCircle, ShieldOff, Activity, Clock, Camera, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
-import { getActiveSessions, getAdminSession, markSessionReviewed, suspendTest, getFraudLog } from '../services/api'
+import { getActiveSessions, getAdminSession, markSessionReviewed, suspendTest, getFraudLog, deleteSession } from '../services/api'
 
 const EVENT_LABELS = {
   face_not_detected: 'No face detected',
@@ -83,6 +83,17 @@ export default function MonitoringDashboard() {
       setSelected(null); setDetail(null)
       load()
     } catch { toast.error('Failed') }
+  }
+
+  async function handleDelete(sessionId, e) {
+    e.stopPropagation()
+    if (!confirm('Delete this session record? This cannot be undone.')) return
+    try {
+      await deleteSession(sessionId)
+      toast.success('Session deleted')
+      setSessions(prev => prev.filter(s => s.session_id !== sessionId))
+      if (selected?.session_id === sessionId) { setSelected(null); setDetail(null) }
+    } catch { toast.error('Failed to delete') }
   }
 
   const warningColor = (count) => {
@@ -192,15 +203,25 @@ export default function MonitoringDashboard() {
 
         <div className={tab === 'cameras' ? 'hidden' : ''}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sessions.map((s) => (
+          {sessions
+            .filter(s => tab === 'ongoing' ? s.status === 'started' : true)
+            .map((s) => (
             <div key={s.session_id}
-              className={`card cursor-pointer hover:shadow-md transition-shadow border-l-4
+              className={`card cursor-pointer hover:shadow-md transition-shadow border-l-4 relative
                 ${s.is_blocked || s.status === 'suspended' ? 'border-l-red-500 bg-red-50'
                   : s.warning_count >= 3 ? 'border-l-orange-400'
                   : s.status === 'submitted' ? 'border-l-green-400'
                   : 'border-l-blue-400'}`}
               onClick={() => openDetail(s)}>
-              <div className="flex justify-between items-start mb-3">
+              {/* Delete button */}
+              <button
+                onClick={(e) => handleDelete(s.session_id, e)}
+                className="absolute top-2 right-2 p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition z-10"
+                title="Delete session">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+
+              <div className="flex justify-between items-start mb-3 pr-6">
                 <div className="flex items-center gap-3">
                   {/* Candidate photo */}
                   <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
@@ -398,6 +419,10 @@ export default function MonitoringDashboard() {
                     </button>
                   </div>
                 )}
+                <button onClick={(e) => handleDelete(selected.session_id, e)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-red-200 text-red-500 text-sm font-medium hover:bg-red-50 transition mt-2">
+                  <Trash2 className="w-4 h-4" /> Delete Session Record
+                </button>
               </div>
             )}
           </div>
