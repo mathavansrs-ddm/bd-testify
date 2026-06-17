@@ -224,7 +224,10 @@ def validate_token(token: str, db: Session = Depends(get_db)):
 
 @router.get("/history")
 def invite_history(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
-    invites = db.query(models.TestInvite).order_by(models.TestInvite.sent_at.desc()).all()
+    query = db.query(models.TestInvite)
+    if admin.role == models.AdminRole.master:
+        query = query.filter(models.TestInvite.invited_by_admin == admin.id)
+    invites = query.order_by(models.TestInvite.sent_at.desc()).all()
     result = []
     for inv in invites:
         status = "used" if inv.is_used else ("expired" if inv.expires_at < datetime.utcnow() else "pending")

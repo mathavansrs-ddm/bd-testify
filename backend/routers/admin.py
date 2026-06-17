@@ -56,19 +56,30 @@ def admin_login(data: schemas.AdminLogin, request: Request, db: Session = Depend
 
 @router.get("/dashboard/stats", response_model=schemas.DashboardStats)
 def dashboard_stats(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
-    total_candidates = db.query(models.Candidate).count()
+    is_master = admin.role == models.AdminRole.master
+    owned_ids = [ts.id for ts in db.query(models.TestSet.id).filter(models.TestSet.created_by == admin.id).all()] if is_master else None
+
+    if is_master:
+        candidate_ids = [s.candidate_id for s in db.query(models.TestSession.candidate_id).filter(models.TestSession.test_set_id.in_(owned_ids)).distinct().all()]
+        total_candidates = db.query(models.Candidate).filter(models.Candidate.id.in_(candidate_ids)).count()
+    else:
+        total_candidates = db.query(models.Candidate).count()
+
     today = date.today()
-    tests_today = db.query(models.TestSession).filter(
-        cast(models.TestSession.started_at, Date) == today
-    ).count()
-    avg_result = db.query(func.avg(models.TestSession.percentage)).filter(
-        models.TestSession.status == models.SessionStatus.submitted
-    ).scalar()
+    sessions_q = db.query(models.TestSession)
+    if is_master:
+        sessions_q = sessions_q.filter(models.TestSession.test_set_id.in_(owned_ids))
+
+    tests_today = sessions_q.filter(cast(models.TestSession.started_at, Date) == today).count()
+
+    avg_result = sessions_q.filter(models.TestSession.status == models.SessionStatus.submitted).with_entities(func.avg(models.TestSession.percentage)).scalar()
     average_score = round(float(avg_result or 0), 2)
-    pending_reviews = db.query(models.TestSession).filter(
+
+    pending_reviews = sessions_q.filter(
         models.TestSession.is_reviewed == False,
         models.TestSession.status == models.SessionStatus.submitted
     ).count()
+
     return {
         "total_candidates": total_candidates,
         "tests_today": tests_today,
