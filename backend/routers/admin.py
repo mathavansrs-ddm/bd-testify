@@ -249,7 +249,10 @@ def create_test_set(data: schemas.TestSetCreate, db: Session = Depends(get_db), 
 
 @router.get("/test-sets", response_model=List[schemas.TestSetOut])
 def list_test_sets(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
-    sets = db.query(models.TestSet).all()
+    query = db.query(models.TestSet)
+    if admin.role == models.AdminRole.master:
+        query = query.filter(models.TestSet.created_by == admin.id)
+    sets = query.all()
     result = []
     for ts in sets:
         out = schemas.TestSetOut.model_validate(ts)
@@ -459,6 +462,10 @@ def list_candidates(
     admin=Depends(get_current_admin)
 ):
     query = db.query(models.Candidate)
+    if admin.role == models.AdminRole.master:
+        owned_test_set_ids = [ts.id for ts in db.query(models.TestSet.id).filter(models.TestSet.created_by == admin.id).all()]
+        candidate_ids = [s.candidate_id for s in db.query(models.TestSession.candidate_id).filter(models.TestSession.test_set_id.in_(owned_test_set_ids)).distinct().all()]
+        query = query.filter(models.Candidate.id.in_(candidate_ids))
     if search:
         query = query.filter(
             models.Candidate.name.ilike(f"%{search}%") |
@@ -560,6 +567,9 @@ def list_sessions(
     admin=Depends(get_current_admin)
 ):
     query = db.query(models.TestSession)
+    if admin.role == models.AdminRole.master:
+        owned_ids = [ts.id for ts in db.query(models.TestSet.id).filter(models.TestSet.created_by == admin.id).all()]
+        query = query.filter(models.TestSession.test_set_id.in_(owned_ids))
     if status:
         query = query.filter(models.TestSession.status == status)
     sessions = query.order_by(models.TestSession.started_at.desc()).all()
