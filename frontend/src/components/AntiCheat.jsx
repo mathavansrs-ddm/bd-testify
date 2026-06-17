@@ -38,7 +38,7 @@ function faceDistance(a, b) {
   return Math.sqrt(sum)
 }
 
-export default function AntiCheat({ sessionId, videoRef, onBlock }) {
+export default function AntiCheat({ sessionId, videoRef, onBlock, onWarn }) {
   const [status, setStatus] = useState('loading')   // loading|ok|no_face|multi|impersonator|audio|blocked|unavailable
   const [detail, setDetail] = useState('')
 
@@ -62,12 +62,13 @@ export default function AntiCheat({ sessionId, videoRef, onBlock }) {
     onBlock?.(reason)
   }, [sessionId, onBlock])
 
-  const report = useCallback(async (eventType) => {
+  const report = useCallback(async (eventType, warnMsg) => {
     try {
       const res = await logEvent({ session_id: sessionId, event_type: eventType })
+      if (res.data?.warning_count !== undefined) onWarn?.(res.data.warning_count, warnMsg)
       if (res.data?.blocked) block('Auto-blocked by server', eventType)
     } catch (_) {}
-  }, [sessionId, block])
+  }, [sessionId, block, onWarn])
 
   const audioCancelledRef = useRef(false)
 
@@ -94,7 +95,7 @@ export default function AntiCheat({ sessionId, videoRef, onBlock }) {
           const secs = (Date.now() - audioSpikeStart.current) / 1000
           if (secs >= AUDIO_SPIKE_SECONDS) {
             audioSpikeStart.current = null
-            report('suspicious_audio')
+            report('suspicious_audio', 'Suspicious audio detected in the exam environment.')
             setStatus('audio')
             setDetail('Suspicious audio detected')
           }
@@ -136,10 +137,10 @@ export default function AntiCheat({ sessionId, videoRef, onBlock }) {
             setStatus('no_face')
             setDetail(`No face (${noFaceStrikes.current}/${NO_FACE_BLOCK_AFTER})`)
             if (noFaceStrikes.current >= NO_FACE_BLOCK_AFTER) {
-              await report('face_not_detected')
+              await report('face_not_detected', 'Face not detected for extended period.')
               await block('Candidate not visible for extended period', 'face_not_detected')
             } else {
-              await report('face_not_detected')
+              await report('face_not_detected', 'Face not detected in camera. Please stay visible.')
             }
             return
           }
@@ -151,7 +152,7 @@ export default function AntiCheat({ sessionId, videoRef, onBlock }) {
             fraudStrikes.current += 1
             setStatus('multi')
             setDetail(`Multiple faces (${detections.length})`)
-            await report('multiple_faces')
+            await report('multiple_faces', 'Multiple faces detected in camera frame.')
             if (fraudStrikes.current >= FRAUD_BLOCK_AFTER) {
               await block('Multiple people detected in frame', 'multiple_faces')
             }
@@ -173,7 +174,7 @@ export default function AntiCheat({ sessionId, videoRef, onBlock }) {
             fraudStrikes.current += 1
             setStatus('impersonator')
             setDetail(`Different person detected (dist=${dist.toFixed(2)}, strike ${fraudStrikes.current}/${FRAUD_BLOCK_AFTER})`)
-            await report('multiple_faces')
+            await report('multiple_faces', 'Identity mismatch — different person detected in camera.')
             if (fraudStrikes.current >= FRAUD_BLOCK_AFTER) {
               await block('Identity mismatch — different person detected', 'multiple_faces')
             }

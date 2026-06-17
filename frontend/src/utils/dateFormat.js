@@ -1,16 +1,26 @@
 const IST = { timeZone: 'Asia/Kolkata' }
 
+// Backend returns naive UTC datetimes without 'Z' — append it so JS treats them as UTC
+function toDate(date) {
+  if (!date) return null
+  const s = typeof date === 'string' && !date.endsWith('Z') && !date.includes('+') ? date + 'Z' : date
+  return new Date(s)
+}
+
 export function formatIST(date, opts = {}) {
-  if (!date) return '—'
-  return new Date(date).toLocaleString('en-IN', { ...IST, ...opts })
+  const d = toDate(date)
+  if (!d) return '—'
+  return d.toLocaleString('en-IN', { ...IST, ...opts })
 }
 
 export function formatISTTime(date) {
-  if (!date) return '—'
-  return new Date(date).toLocaleTimeString('en-IN', IST)
+  const d = toDate(date)
+  if (!d) return '—'
+  return d.toLocaleTimeString('en-IN', IST)
 }
 
 export function formatISTDate(date) {
-  if (!date) return '—'
-  return new Date(date).toLocaleDateString('en-IN', IST)
+  const d = toDate(date)
+  if (!d) return '—'
+  return d.toLocaleDateString('en-IN', IST)
 }

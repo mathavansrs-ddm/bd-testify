@@ -788,6 +788,10 @@ export default function TestRoom() {
         <AntiCheat
           sessionId={sessionData.session_id}
           videoRef={videoRef}
+          onWarn={(count, msg) => {
+            setWarningCount(count)
+            if (msg) showWarningOverlay(msg)
+          }}
           onBlock={(reason) => {
             showWarningOverlay(`BLOCKED: ${reason}`)
             clearInterval(snapshotTimer.current)
