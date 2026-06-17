@@ -1,9 +1,12 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import {
   LayoutDashboard, Layers, Users,
-  Monitor, Mail, LogOut, ClipboardList, ShieldCheck, Activity
+  Monitor, Mail, LogOut, ClipboardList, ShieldCheck, Activity, KeyRound, X
 } from 'lucide-react'
 import { useAdminRole } from '../hooks/useAdminRole'
+import { changePassword } from '../services/api'
+import toast from 'react-hot-toast'
 
 const baseNavItems = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -22,12 +25,38 @@ export default function AdminLayout({ children, title }) {
   const navigate = useNavigate()
   const { isSuperAdmin, name, role } = useAdminRole()
   const navItems = isSuperAdmin ? [...baseNavItems, ...superAdminItems] : baseNavItems
+  const [showChangePwd, setShowChangePwd] = useState(false)
+  const [pwdForm, setPwdForm] = useState({ current_password: '', new_password: '', confirm: '' })
+  const [pwdLoading, setPwdLoading] = useState(false)
 
   function logout() {
     localStorage.removeItem('admin_token')
     localStorage.removeItem('admin_role')
     localStorage.removeItem('admin_name')
     navigate('/admin/login')
+  }
+
+  async function handleChangePwd(e) {
+    e.preventDefault()
+    if (pwdForm.new_password !== pwdForm.confirm) {
+      toast.error('New passwords do not match')
+      return
+    }
+    if (pwdForm.new_password.length < 8) {
+      toast.error('Password must be at least 8 characters')
+      return
+    }
+    setPwdLoading(true)
+    try {
+      await changePassword({ current_password: pwdForm.current_password, new_password: pwdForm.new_password })
+      toast.success('Password changed successfully')
+      setShowChangePwd(false)
+      setPwdForm({ current_password: '', new_password: '', confirm: '' })
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to change password')
+    } finally {
+      setPwdLoading(false)
+    }
   }
 
   return (
@@ -71,6 +100,13 @@ export default function AdminLayout({ children, title }) {
             </span>
           </div>
           <button
+            onClick={() => setShowChangePwd(true)}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-navy-200 hover:bg-navy-800 hover:text-white transition-colors"
+          >
+            <KeyRound className="w-4 h-4" />
+            Change Password
+          </button>
+          <button
             onClick={logout}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-navy-200 hover:bg-navy-800 hover:text-white transition-colors"
           >
@@ -79,6 +115,51 @@ export default function AdminLayout({ children, title }) {
           </button>
         </div>
       </aside>
+
+      {/* Change Password Modal */}
+      {showChangePwd && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Change Password</h3>
+              <button onClick={() => setShowChangePwd(false)}><X className="w-5 h-5 text-gray-400" /></button>
+            </div>
+            <form onSubmit={handleChangePwd} className="space-y-3">
+              <input
+                type="password"
+                placeholder="Current password"
+                value={pwdForm.current_password}
+                onChange={e => setPwdForm(f => ({ ...f, current_password: e.target.value }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                required
+              />
+              <input
+                type="password"
+                placeholder="New password (min 8 characters)"
+                value={pwdForm.new_password}
+                onChange={e => setPwdForm(f => ({ ...f, new_password: e.target.value }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                required
+              />
+              <input
+                type="password"
+                placeholder="Confirm new password"
+                value={pwdForm.confirm}
+                onChange={e => setPwdForm(f => ({ ...f, confirm: e.target.value }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                required
+              />
+              <button
+                type="submit"
+                disabled={pwdLoading}
+                className="w-full bg-slate-900 text-white rounded-lg py-2 text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
+              >
+                {pwdLoading ? 'Changing...' : 'Change Password'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
