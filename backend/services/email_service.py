@@ -5,42 +5,30 @@ load_dotenv()
 
 
 def _send_email(to_email: str, subject: str, html_body: str):
-    api_key = os.getenv("SENDGRID_API_KEY", "")
-    from_email = os.getenv("FROM_EMAIL", "bdtestifyinfo@gmail.com")
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    from_email = os.getenv("FROM_EMAIL", smtp_user)
     from_name = os.getenv("FROM_NAME", "BD Testify")
 
-    if not api_key:
-        raise Exception("SENDGRID_API_KEY is not set in environment variables.")
+    if not smtp_user or not smtp_password:
+        raise Exception("SMTP credentials not configured.")
 
-    import urllib.request
-    import urllib.error
-    import json
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"{from_name} <{from_email}>"
+    msg["To"] = to_email
+    msg.attach(MIMEText(html_body, "html"))
 
-    payload = {
-        "personalizations": [{"to": [{"email": to_email}]}],
-        "from": {"email": from_email, "name": from_name},
-        "subject": subject,
-        "content": [{"type": "text/html", "value": html_body}]
-    }
-
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        "https://api.sendgrid.com/v3/mail/send",
-        data=data,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST"
-    )
-
-    try:
-        with urllib.request.urlopen(req) as resp:
-            if resp.status not in (200, 201, 202):
-                raise Exception(f"SendGrid returned status {resp.status}")
-    except urllib.error.HTTPError as e:
-        body = e.read().decode()
-        raise Exception(f"SendGrid error {e.code}: {body}")
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.sendmail(from_email, to_email, msg.as_string())
 
 
 def send_invite_email(to_email: str, candidate_name: str, test_link: str, expires_in: str = "24 hours"):
