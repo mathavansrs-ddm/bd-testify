@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Layers, Users,
-  Monitor, Mail, LogOut, ClipboardList, ShieldCheck
+  Monitor, Mail, LogOut, ClipboardList, ShieldCheck, Activity
 } from 'lucide-react'
 import { useAdminRole } from '../hooks/useAdminRole'
 
@@ -11,6 +11,7 @@ const baseNavItems = [
   { to: '/admin/candidates', icon: Users, label: 'Candidates' },
   { to: '/admin/monitoring', icon: Monitor, label: 'Monitoring' },
   { to: '/admin/invite', icon: Mail, label: 'Invite' },
+  { to: '/admin/my-activity', icon: Activity, label: 'My Activity' },
 ]
 
 const superAdminItems = [

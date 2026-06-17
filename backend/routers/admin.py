@@ -849,6 +849,22 @@ def get_all_activity(db: Session = Depends(get_db), admin=Depends(require_supera
     return result
 
 
+# ── Own activity log (any logged-in admin sees only their own logs) ──────
+
+@router.get("/my-activity", response_model=List[schemas.ActivityLogOut])
+def get_my_activity(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    logs = db.query(models.AdminActivityLog).filter(
+        models.AdminActivityLog.admin_id == admin.id
+    ).order_by(models.AdminActivityLog.created_at.desc()).limit(200).all()
+    result = []
+    for log in logs:
+        out = schemas.ActivityLogOut.model_validate(log)
+        out.admin_name = admin.name
+        out.admin_email = admin.email
+        result.append(out)
+    return result
+
+
 # ── Password change (self) ───────────────────────────────────────────────
 
 @router.put("/change-password")
