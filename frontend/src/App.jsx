@@ -24,6 +24,14 @@ function PrivateRoute({ children }) {
   return token ? children : <Navigate to="/admin/login" replace />
 }
 
+function SuperAdminRoute({ children }) {
+  const token = localStorage.getItem('admin_token')
+  const role = localStorage.getItem('admin_role')
+  if (!token) return <Navigate to="/admin/login" replace />
+  if (role !== 'superadmin') return <Navigate to="/admin/dashboard" replace />
+  return children
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -40,7 +48,7 @@ export default function App() {
         <Route path="/admin/candidates" element={<PrivateRoute><CandidateList /></PrivateRoute>} />
         <Route path="/admin/monitoring" element={<PrivateRoute><MonitoringDashboard /></PrivateRoute>} />
         <Route path="/admin/invite" element={<PrivateRoute><InviteManager /></PrivateRoute>} />
-        <Route path="/admin/masters" element={<PrivateRoute><Masters /></PrivateRoute>} />
+        <Route path="/admin/masters" element={<SuperAdminRoute><Masters /></SuperAdminRoute>} />
         <Route path="/admin/my-activity" element={<PrivateRoute><MyActivity /></PrivateRoute>} />
         <Route path="/admin/reset-password" element={<ResetPassword />} />
 
