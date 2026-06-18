@@ -174,6 +174,7 @@ async def bulk_upload_questions(
             'correct_answer': ['correct_answer', 'correct answer', 'answer', 'ans', 'correct', 'key'],
             'marks': ['marks', 'mark', 'score', 'points'],
             'test_set_id': ['test_set_id', 'test set id', 'testset', 'set_id', 'set id'],
+            'section': ['section', 'section_name', 'section name'],
         }
 
         def normalize_row(raw):
@@ -215,6 +216,23 @@ async def bulk_upload_questions(
                 if not ts_id:
                     raise ValueError("test_set_id is required. Select a test set before uploading or include it in the CSV.")
 
+                # Resolve section: CSV section name takes priority over dropdown section_id
+                resolved_section_id = section_id
+                row_section_name = row.get('section', '').strip()
+                if row_section_name:
+                    sec = db.query(models.Section).filter(
+                        models.Section.test_set_id == ts_id,
+                        models.Section.name.ilike(row_section_name),
+                    ).first()
+                    if sec:
+                        resolved_section_id = sec.id
+                    else:
+                        # Auto-create the section if it doesn't exist
+                        sec = models.Section(test_set_id=ts_id, name=row_section_name)
+                        db.add(sec)
+                        db.flush()
+                        resolved_section_id = sec.id
+
                 q = models.Question(
                     question_text=row['question_text'],
                     option_a=row['option_a'],
@@ -224,7 +242,7 @@ async def bulk_upload_questions(
                     correct_answer=correct,
                     marks=int(float(row.get('marks') or 1)),
                     test_set_id=ts_id,
-                    section_id=section_id,
+                    section_id=resolved_section_id,
                     created_by=admin.id,
                 )
                 db.add(q)

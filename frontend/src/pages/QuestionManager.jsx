@@ -106,9 +106,10 @@ export default function QuestionManager() {
   }
 
   function downloadTemplate() {
-    const csv = 'question_text,option_a,option_b,option_c,option_d,correct_answer,marks,test_set_id\n' +
-      '"What is 2+2?","1","2","4","8","c",1,\n' +
-      '"Capital of India?","Mumbai","Delhi","Chennai","Kolkata","b",1,\n'
+    const csv = 'question_text,option_a,option_b,option_c,option_d,correct_answer,marks,section\n' +
+      '"What is 2+2?","1","2","4","8","c",1,"General"\n' +
+      '"Capital of India?","Mumbai","Delhi","Chennai","Kolkata","b",1,"General"\n' +
+      '"What is H2O?","Hydrogen","Water","Oxygen","Salt","b",2,"Science"\n'
     const blob = new Blob([csv], { type: 'text/csv' })
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
     a.download = 'questions_template.csv'; a.click()
