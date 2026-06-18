@@ -35,6 +35,7 @@ export default function TestRoom() {
   const [photoCaptured, setPhotoCaptured] = useState(false)
   const [photoDataUrl, setPhotoDataUrl] = useState(null)
 
+  const [liveStream, setLiveStream] = useState(null)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const snapshotTimer = useRef(null)
@@ -156,6 +157,7 @@ export default function TestRoom() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       streamRef.current = stream
+      setLiveStream(stream)
       if (videoRef.current) {
         videoRef.current.srcObject = stream
       }
@@ -648,7 +650,7 @@ export default function TestRoom() {
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Live Camera</p>
               <div className="rounded-xl overflow-hidden bg-slate-900 aspect-video">
-                <WebcamMonitor videoRef={videoRef} />
+                <WebcamMonitor stream={liveStream} />
               </div>
             </div>
             {/* AntiCheat rendered here for desktop — hidden on mobile via parent div but still active */}
@@ -683,7 +685,7 @@ export default function TestRoom() {
           {/* Floating camera — small, top-right corner, non-blocking */}
           {/* AntiCheat is NOT duplicated here — it runs once in the desktop layout which is always in DOM */}
           <div className="fixed top-14 right-2 w-24 z-30 rounded-xl overflow-hidden shadow-lg border border-slate-600">
-            <WebcamMonitor videoRef={videoRef} />
+            <WebcamMonitor stream={liveStream} />
           </div>
 
           {/* Fixed bottom nav bar */}

@@ -1,6 +1,14 @@
-// Pure display component — renders the shared stream from TestRoom.
-// TestRoom owns the stream lifecycle; this just shows it.
-export default function WebcamMonitor({ videoRef }) {
+import { useEffect, useRef } from 'react'
+
+export default function WebcamMonitor({ stream }) {
+  const videoRef = useRef(null)
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream
+    }
+  }, [stream])
+
   return (
     <div className="relative">
       <video
