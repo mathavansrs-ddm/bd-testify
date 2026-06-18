@@ -83,9 +83,35 @@ export default function InviteManager() {
   }
 
   function copyLink(token) {
-    navigator.clipboard.writeText(`${window.location.origin}/register?token=${token}`)
-    setCopiedToken(token)
-    setTimeout(() => setCopiedToken(null), 2000)
+    const text = `${window.location.origin}/register?token=${token}`
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        setCopiedToken(token)
+        setTimeout(() => setCopiedToken(null), 2000)
+        toast.success('Link copied!')
+      }).catch(() => fallbackCopy(text, token))
+    } else {
+      fallbackCopy(text, token)
+    }
+  }
+
+  function fallbackCopy(text, token) {
+    const el = document.createElement('textarea')
+    el.value = text
+    el.style.position = 'fixed'
+    el.style.opacity = '0'
+    document.body.appendChild(el)
+    el.focus()
+    el.select()
+    try {
+      document.execCommand('copy')
+      setCopiedToken(token)
+      setTimeout(() => setCopiedToken(null), 2000)
+      toast.success('Link copied!')
+    } catch {
+      toast.error('Could not copy — please copy the link manually:\n' + text, { duration: 10000 })
+    }
+    document.body.removeChild(el)
   }
 
   const TABS = [
