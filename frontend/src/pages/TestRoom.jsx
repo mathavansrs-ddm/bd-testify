@@ -7,6 +7,7 @@ import Timer from '../components/Timer'
 import ProgressBar from '../components/ProgressBar'
 import WebcamMonitor from '../components/Webcam'
 import AntiCheat from '../components/AntiCheat'
+import FaceMonitor, { captureReferenceDescriptor, preloadFaceApi } from '../components/FaceMonitor'
 import { AlertTriangle, CheckCircle, Camera, Shield, Eye, Clock, RefreshCw, X, Layers } from 'lucide-react'
 
 const STEPS = { SYSTEM_CHECK: 'system_check', TEST: 'test', FINISHED: 'finished', ERROR: 'error', SUSPENDED: 'suspended' }
@@ -36,6 +37,7 @@ export default function TestRoom() {
   const [photoDataUrl, setPhotoDataUrl] = useState(null)
 
   const [liveStream, setLiveStream] = useState(null)
+  const [referenceDescriptor, setReferenceDescriptor] = useState(null)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const snapshotTimer = useRef(null)
@@ -163,6 +165,7 @@ export default function TestRoom() {
       }
       setCameraOk(true)
       toast.success('Camera and microphone ready!')
+      preloadFaceApi()
     } catch {
       toast.error('Camera or microphone access denied. Please allow access and try again.')
     } finally {
@@ -180,6 +183,10 @@ export default function TestRoom() {
     const dataUrl = canvas.toDataURL('image/jpeg', 0.7)
     setPhotoDataUrl(dataUrl)
     setPhotoCaptured(true)
+    // Capture reference face descriptor for identity matching during test
+    captureReferenceDescriptor(video).then(desc => {
+      if (desc) setReferenceDescriptor(desc)
+    })
   }
 
   function sendSnapshot(sessionId) {
@@ -785,6 +792,24 @@ export default function TestRoom() {
             </div>
           </div>
         )}
+
+        {/* FaceMonitor — identity matching + gaze tracking */}
+        <FaceMonitor
+          stream={liveStream}
+          referenceDescriptor={referenceDescriptor}
+          active={true}
+          onWarn={async (type, msg) => {
+            showWarningOverlay(msg)
+            try {
+              const res = await logEvent({ session_id: sessionData.session_id, event_type: type })
+              if (res.data?.warning_count !== undefined) setWarningCount(res.data.warning_count)
+              if (res.data?.blocked) {
+                showWarningOverlay('BLOCKED: Too many violations')
+                clearInterval(snapshotTimer.current)
+              }
+            } catch (_) {}
+          }}
+        />
 
         {/* AntiCheat — single instance, outside layout divs, always active during test */}
         <AntiCheat

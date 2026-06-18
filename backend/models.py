@@ -41,6 +41,8 @@ class CheatEventType(str, enum.Enum):
     fullscreen_exit = "fullscreen_exit"
     copy_attempt = "copy_attempt"
     suspicious_audio = "suspicious_audio"
+    face_mismatch = "face_mismatch"
+    gaze_away = "gaze_away"
 
 
 class AutoAction(str, enum.Enum):
