@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { ClipboardList, ShieldCheck, Users, Trophy, Globe } from 'lucide-react'
+import { ClipboardList, ShieldCheck, Users, Trophy, Globe, Mic, KeyRound, Monitor, BarChart3 } from 'lucide-react'
 import api from '../services/api'
 
 function useCountUp(target, duration = 2000) {
@@ -115,6 +115,24 @@ export default function Home() {
           Secure, AI-proctored online exams with real-time face detection,
           audio monitoring, and instant results.
         </p>
+
+        {/* Feature cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl w-full mb-12">
+          {[
+            { icon: ShieldCheck, title: 'AI Proctoring', desc: 'Face & audio detection', color: 'bg-white/20' },
+            { icon: KeyRound, title: 'Role-Based Access', desc: 'Superadmin & Masters', color: 'bg-white/20' },
+            { icon: Monitor, title: 'Live Monitoring', desc: 'Real-time candidate view', color: 'bg-white/20' },
+            { icon: BarChart3, title: 'Instant Results', desc: 'Auto-scored & emailed', color: 'bg-white/20' },
+          ].map(({ icon: Icon, title, desc, color }) => (
+            <div key={title} className="bg-white/15 border border-white/25 rounded-2xl p-6 text-left backdrop-blur hover:bg-white/20 transition">
+              <div className={`w-11 h-11 ${color} rounded-xl flex items-center justify-center mb-4`}>
+                <Icon className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="text-white font-bold text-base mb-1">{title}</h3>
+              <p className="text-white/65 text-sm">{desc}</p>
+            </div>
+          ))}
+        </div>
 
         {/* Animated stat counters */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl w-full">
