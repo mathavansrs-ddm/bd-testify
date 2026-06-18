@@ -117,3 +117,17 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/public/stats")
+def public_stats():
+    from database import SessionLocal
+    import models as m
+    db = SessionLocal()
+    try:
+        candidates = db.query(m.Candidate).count()
+        sessions = db.query(m.TestSession).filter(m.TestSession.status == m.SessionStatus.submitted).count()
+        questions = db.query(m.Question).count()
+        return {"candidates": candidates, "sessions_completed": sessions, "questions": questions}
+    finally:
+        db.close()

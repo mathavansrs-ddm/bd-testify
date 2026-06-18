@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { Plus, Edit, Trash2, X, Upload, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import AdminLayout from '../components/AdminLayout'
-import { getQuestions, createQuestion, updateQuestion, deleteQuestion, getTestSets, bulkUploadQuestions } from '../services/api'
+import { getQuestions, createQuestion, updateQuestion, deleteQuestion, getTestSets, bulkUploadQuestions, getSections } from '../services/api'
 
 const BLANK = { test_set_id: '', question_text: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_answer: 'a', marks: 1 }
 
@@ -59,6 +59,21 @@ export default function QuestionManager() {
 
   const fileRef = useRef()
   const [bulkTestSetId, setBulkTestSetId] = useState('')
+  const [bulkSectionId, setBulkSectionId] = useState('')
+  const [bulkSections, setBulkSections] = useState([])
+
+  async function handleBulkTestSetChange(id) {
+    setBulkTestSetId(id)
+    setBulkSectionId('')
+    if (id) {
+      try {
+        const r = await getSections(id)
+        setBulkSections(r.data)
+      } catch { setBulkSections([]) }
+    } else {
+      setBulkSections([])
+    }
+  }
 
   async function handleBulkUpload(e) {
     const file = e.target.files[0]
@@ -71,7 +86,7 @@ export default function QuestionManager() {
     const fd = new FormData()
     fd.append('file', file)
     try {
-      const r = await bulkUploadQuestions(fd, bulkTestSetId)
+      const r = await bulkUploadQuestions(fd, bulkTestSetId, bulkSectionId || null)
       const { created, errors } = r.data
       console.log('Bulk upload errors:', errors)
       if (errors.length > 0 && created === 0) {
@@ -111,10 +126,16 @@ export default function QuestionManager() {
           </select>
           <div className="flex items-center gap-2">
             {/* Bulk upload */}
-            <select className="input-field w-44 text-sm" value={bulkTestSetId} onChange={(e) => setBulkTestSetId(e.target.value)}>
+            <select className="input-field w-44 text-sm" value={bulkTestSetId} onChange={(e) => handleBulkTestSetChange(e.target.value)}>
               <option value="">— Assign to set —</option>
               {testSets.map((s) => <option key={s.id} value={s.id}>{s.set_name}</option>)}
             </select>
+            {bulkSections.length > 0 && (
+              <select className="input-field w-40 text-sm" value={bulkSectionId} onChange={(e) => setBulkSectionId(e.target.value)}>
+                <option value="">— No section —</option>
+                {bulkSections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            )}
             <input ref={fileRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={handleBulkUpload} />
             <button onClick={() => fileRef.current.click()} className="btn-secondary flex items-center gap-2 text-sm">
               <Upload className="w-4 h-4" /> Bulk Upload
