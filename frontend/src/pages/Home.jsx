@@ -1,9 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import {
-  ClipboardList, ShieldCheck, ArrowRight,
-  Globe, Briefcase, QrCode, Users, Trophy
-} from 'lucide-react'
+import { ClipboardList, ShieldCheck, Users, Trophy, Globe } from 'lucide-react'
 import api from '../services/api'
 
 function useCountUp(target, duration = 2000) {
@@ -118,34 +115,6 @@ export default function Home() {
           Secure, AI-proctored online exams with real-time face detection,
           audio monitoring, and instant results.
         </p>
-
-        {/* CTA buttons */}
-        <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 mb-20">
-          <button
-            onClick={() => navigate('/register')}
-            className="flex items-center gap-2 bg-white text-orange-600 font-bold px-7 py-3.5 rounded-xl hover:bg-orange-50 transition shadow-lg shadow-black/20"
-          >
-            Register as Student <ArrowRight className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => navigate('/employee/login')}
-            className="flex items-center gap-2 bg-white/15 border border-white/30 text-white font-semibold px-7 py-3.5 rounded-xl hover:bg-white/25 transition backdrop-blur"
-          >
-            <Briefcase className="w-4 h-4" /> Employee Login
-          </button>
-          <button
-            onClick={() => navigate('/tests')}
-            className="flex items-center gap-2 bg-white/15 border border-white/30 text-white font-semibold px-7 py-3.5 rounded-xl hover:bg-white/25 transition backdrop-blur"
-          >
-            <Globe className="w-4 h-4" /> Open Tests
-          </button>
-          <button
-            onClick={() => navigate('/qr-landing')}
-            className="flex items-center gap-2 bg-white/15 border border-white/30 text-white font-semibold px-7 py-3.5 rounded-xl hover:bg-white/25 transition backdrop-blur"
-          >
-            <QrCode className="w-4 h-4" /> QR Code Login
-          </button>
-        </div>
 
         {/* Animated stat counters */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl w-full">
